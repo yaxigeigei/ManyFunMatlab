@@ -94,6 +94,9 @@ classdef MMath
             margSize = ones(1, numDims);
             margSize(1:ndims(margDist)) = size(margDist);
             condDist = jointDist ./ repmat(margDist, size(jointDist)./margSize);
+            
+            % Set NaN to zero
+            condDist(isnan(condDist)) = 0;
         end
         
         function H = Entropy(probDist)

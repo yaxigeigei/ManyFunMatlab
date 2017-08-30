@@ -10,27 +10,52 @@ classdef Browse
     end
     
     methods(Static)
-        function [ filePath, folderName, bareName, ext ] = File(folderName)
+        function [ filePath, folderPath, bareName, ext ] = File(defaultFolderPath, dialogTitle, filterSpec)
             % Browse to select a file and get path parts
             %
-            %   [ filePath, folderName, bareName, ext ] = File()
-            %   [ filePath, folderName, bareName, ext ] = File(folderName)
+            %   [ filePath, folderPath, bareName, ext ] = Browse.File()
+            %   [ filePath, folderPath, bareName, ext ] = Browse.File(defaultFolderPath)
+            %   [ filePath, folderPath, bareName, ext ] = Browse.File(defaultFolderPath, dialogTitle)
+            %   [ filePath, folderPath, bareName, ext ] = Browse.File(defaultFolderPath, dialogTitle, filterSpec)
             %
             
+            % Handle user inputs
+            if nargin < 3
+                filterSpec = {'*.*'};
+            end
+            
+            if nargin < 2
+                dialogTitle = [];
+            end
+            
             if nargin < 1
+                defaultFolderPath = [];
+            end
+            
+            if isempty(dialogTitle)
+                dialogTitle = 'Please select a file';
+            end
+            
+            if isempty(defaultFolderPath)
                 try
-                    load('lastimeDir');
+                    load('lastimeDir', 'defaultFolderPath');
                 catch
-                    folderName = pwd;
+                    defaultFolderPath = pwd;
                 end
             end
             
-            [ fileName, folderName ] = uigetfile({'*.*'}, 'Select Data', [folderName '\']);
+            % Get file path info
+            [ fileName, folderPath ] = uigetfile(filterSpec, dialogTitle, defaultFolderPath);
             
-            if folderName
-                filePath = fullfile(folderName, fileName);
+            % Check selection
+            if folderPath
+                % Decompose paths
+                filePath = fullfile(folderPath, fileName);
                 [ ~, bareName, ext ] = fileparts(fileName);
-                save('lastimeDir.mat', 'folderName');
+                
+                % Remember new folder path
+                defaultFolderPath = folderPath;
+                save('lastimeDir.mat', 'defaultFolderPath');
             else
                 filePath = '';
                 bareName = '';
@@ -38,28 +63,52 @@ classdef Browse
             end
         end
         
-        function [ filePath, folderName, bareNames, exts ] = Files(folderName)
+        function [ filePath, folderPath, bareNames, exts ] = Files(defaultFolderPath, dialogTitle, filterSpec)
             % Browse to select multiple files and get path parts
             %
-            %   [ filePath, folderName, bareNames, exts ] = Files()
-            %   [ filePath, folderName, bareNames, exts ] = Files(folderName)
+            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files()
+            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files(defaultFolderPath)
+            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files(defaultFolderPath, dialogTitle)
+            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files(defaultFolderPath, dialogTitle, filterSpec)
             %
             
+            % Handle user inputs
+            if nargin < 3
+                filterSpec = {'*.*'};
+            end
+            
+            if nargin < 2
+                dialogTitle = [];
+            end
+            
             if nargin < 1
+                defaultFolderPath = [];
+            end
+            
+            if isempty(dialogTitle)
+                dialogTitle = 'Please select files';
+            end
+            
+            if isempty(defaultFolderPath)
                 try
-                    load('lastimeDir');
+                    load('lastimeDir', 'defaultFolderPath');
                 catch
-                    folderName = pwd;
+                    defaultFolderPath = pwd;
                 end
             end
             
-            [ fileName, folderName ] = uigetfile({'*.*'}, 'Select Data', [folderName '\'], 'MultiSelect', 'on');
+            % Get file path info
+            [ fileName, folderPath ] = uigetfile(filterSpec, dialogTitle, defaultFolderPath, 'MultiSelect', 'on');
             
-            if folderName
+            if folderPath
+                % Decompose paths
                 fileName = cellstr(fileName)';
-                filePath = cellfun(@(x) fullfile(folderName, x), fileName, 'UniformOutput', false);
+                filePath = cellfun(@(x) fullfile(folderPath, x), fileName, 'UniformOutput', false);
                 [ ~, bareNames, exts ] = cellfun(@fileparts, fileName, 'UniformOutput', false);
-                save('lastimeDir.mat', 'folderName');
+                
+                % Remember new folder path
+                defaultFolderPath = folderPath;
+                save('lastimeDir.mat', 'defaultFolderPath');
             else
                 filePath = {};
                 bareNames = {};
@@ -67,28 +116,48 @@ classdef Browse
             end
         end
         
-        function folderName = Folder(folderName)
+        function folderPath = Folder(defaultFolderPath, dialogTitle)
             % Browse to select a folder and get path parts
             %
-            %   [ filePath, folderName, bareName, ext ] = Folder()
-            %   [ filePath, folderName, bareName, ext ] = Folder(folderName)
+            %   folderPath = Browse.Folder()
+            %   folderPath = Browse.Folder(defaultFolderPath)
+            %   folderPath = Browse.Folder(defaultFolderPath, dialogTitle)
             %
             
+            % Handle user inputs
+            if nargin < 2
+                dialogTitle = [];
+            end
+            
             if nargin < 1
+                defaultFolderPath = [];
+            end
+            
+            if isempty(dialogTitle)
+                dialogTitle = 'Please select a folder';
+            end
+            
+            if isempty(defaultFolderPath)
                 try
-                    load('lastimeDir');
+                    load('lastimeDir', 'defaultFolderPath');
                 catch
-                    folderName = pwd;
+                    defaultFolderPath = pwd;
                 end
             end
             
-            folderName = uigetdir(folderName);
+            % Get file path info
+            folderPath = uigetdir(defaultFolderPath, dialogTitle);
             
-            if folderName
-                save('lastimeDir.mat', 'folderName');
+            if folderPath
+                % Remember new folder path
+                defaultFolderPath = folderPath;
+                save('lastimeDir.mat', 'defaultFolderPath');
             end
         end
     end
     
 end
+
+
+
 

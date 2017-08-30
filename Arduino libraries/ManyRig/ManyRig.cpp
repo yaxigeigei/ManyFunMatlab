@@ -123,7 +123,7 @@ bool ManyRig::delayUntil(bool(*f)(void), unsigned long timeout) {
 }
 
 bool ManyRig::delayContinue(bool(*f)(void), unsigned long unitTime) {
-	// Delay and read serial command reiterate when function returns true
+	// Delay and read serial command. Reiterates delay when function returns true
 
 	bool b = false;
 	unsigned long t0 = millis();
@@ -151,7 +151,7 @@ void ManyRig::serialSend(String msg) {
 	Serial.println(msg);
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t) {
 	// Send data message with the header
 
 	unsigned long tStart = micros();
@@ -167,7 +167,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t) {
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile byte num) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile byte num) {
 	// Send data message with the header and value
 
 	unsigned long tStart = micros();
@@ -185,7 +185,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile byte num) {
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile int num) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile int num) {
 	// Send data message with the header and value
 
 	unsigned long tStart = micros();
@@ -203,7 +203,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile int num) {
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned int num) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned int num) {
 	// Send data message by event type, time, and value
 
 	unsigned long tStart = micros();
@@ -221,7 +221,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned in
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile long num) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile long num) {
 	// Send data message with the header and value
 
 	unsigned long tStart = micros();
@@ -239,7 +239,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile long num) {
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned long num) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned long num) {
 	// Send data message with the header and value
 
 	unsigned long tStart = micros();
@@ -257,7 +257,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned lo
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile float num) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile float num) {
 	// Send data message with the header and value
 
 	unsigned long tStart = micros();
@@ -275,7 +275,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile float num) 
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile byte* dataArray, byte numData) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile byte* dataArray, byte numData) {
 	// Send data message with the header and an array of bytes, separated by commas
 
 	unsigned long tStart = micros();
@@ -296,7 +296,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile byte* dataA
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile int* dataArray, byte numData) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile int* dataArray, byte numData) {
 	// Send data message with the header and an array of ints, separated by commas
 
 	unsigned long tStart = micros();
@@ -317,7 +317,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile int* dataAr
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned int* dataArray, byte numData) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned int* dataArray, byte numData) {
 	// Send data message with the header and an array of unsigned ints, separated by commas
 
 	unsigned long tStart = micros();
@@ -338,7 +338,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned in
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile long* dataArray, byte numData) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile long* dataArray, byte numData) {
 	// Send data message with the header and an array of long integers, separated by commas
 
 	unsigned long tStart = micros();
@@ -359,7 +359,7 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile long* dataA
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned long* dataArray, byte numData) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned long* dataArray, byte numData) {
 	// Send data message with the header and an array of unsigned long integers, separated by commas
 
 	unsigned long tStart = micros();
@@ -380,7 +380,257 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile unsigned lo
 	return micros() - tStart;
 }
 
-unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile float* dataArray, byte numData) {
+unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile float* dataArray, byte numData) {
+	// Send data message with the header and an array of floating point numbers, separated by commas
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	for (int i = 0; i < numData; i++) {
+		msg += _delimiter;
+		msg += dataArray[i];
+	}
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t) {
+	// Send data message with the header
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte num) {
+	// Send data message with the header and value
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+	msg += _delimiter;
+	msg += num;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile int num) {
+	// Send data message with the header and value
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+	msg += _delimiter;
+	msg += num;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int num) {
+	// Send data message by event type, time, and value
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+	msg += _delimiter;
+	msg += num;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile long num) {
+	// Send data message with the header and value
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+	msg += _delimiter;
+	msg += num;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long num) {
+	// Send data message with the header and value
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+	msg += _delimiter;
+	msg += num;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile float num) {
+	// Send data message with the header and value
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+	msg += _delimiter;
+	msg += num;
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte* dataArray, byte numData) {
+	// Send data message with the header and an array of bytes, separated by commas
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	for (int i = 0; i < numData; i++) {
+		msg += _delimiter;
+		msg += dataArray[i];
+	}
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile int* dataArray, byte numData) {
+	// Send data message with the header and an array of ints, separated by commas
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	for (int i = 0; i < numData; i++) {
+		msg += _delimiter;
+		msg += dataArray[i];
+	}
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int* dataArray, byte numData) {
+	// Send data message with the header and an array of unsigned ints, separated by commas
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	for (int i = 0; i < numData; i++) {
+		msg += _delimiter;
+		msg += dataArray[i];
+	}
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile long* dataArray, byte numData) {
+	// Send data message with the header and an array of long integers, separated by commas
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	for (int i = 0; i < numData; i++) {
+		msg += _delimiter;
+		msg += dataArray[i];
+	}
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long* dataArray, byte numData) {
+	// Send data message with the header and an array of unsigned long integers, separated by commas
+
+	unsigned long tStart = micros();
+
+	String msg = String();
+
+	msg += tag;
+	msg += _delimiter;
+	msg += t;
+
+	for (int i = 0; i < numData; i++) {
+		msg += _delimiter;
+		msg += dataArray[i];
+	}
+
+	_senderFunc(msg);
+
+	return micros() - tStart;
+}
+
+unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile float* dataArray, byte numData) {
 	// Send data message with the header and an array of floating point numbers, separated by commas
 
 	unsigned long tStart = micros();
@@ -406,12 +656,10 @@ unsigned long ManyRig::sendData(char* tag, unsigned long t, volatile float* data
 unsigned long ManyRig::sendNumTTL(byte pin, unsigned long num) {
 	// Send integer via TTL. The duration equals the number times 100us.
 
-	unsigned long durInUs = num * 100;
+	unsigned long durInUs = num * 1000;
 
 	digitalWrite(pin, HIGH);
-
 	delayMicroseconds(durInUs);
-
 	digitalWrite(pin, LOW);
 
 	return durInUs;

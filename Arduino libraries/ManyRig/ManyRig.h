@@ -10,6 +10,9 @@ Released into the public domain.
 
 
 #include "Arduino.h"
+#include "boardnames.h"
+
+
 
 class ManyRig
 {
@@ -39,19 +42,34 @@ public:
 	// Sending formatted data message
 	void attachSender(void(*f)(String));
 
-	unsigned long sendData(char* tag, unsigned long t);
-	unsigned long sendData(char* tag, unsigned long t, volatile byte num);
-	unsigned long sendData(char* tag, unsigned long t, volatile int num);
-	unsigned long sendData(char* tag, unsigned long t, volatile unsigned int num);
-	unsigned long sendData(char* tag, unsigned long t, volatile long num);
-	unsigned long sendData(char* tag, unsigned long t, volatile unsigned long num);
-	unsigned long sendData(char* tag, unsigned long t, volatile float num);
-	unsigned long sendData(char* tag, unsigned long t, volatile byte* dataArray, byte numData);
-	unsigned long sendData(char* tag, unsigned long t, volatile int* dataArray, byte numData);
-	unsigned long sendData(char* tag, unsigned long t, volatile unsigned int* dataArray, byte numData);
-	unsigned long sendData(char* tag, unsigned long t, volatile long* dataArray, byte numData);
-	unsigned long sendData(char* tag, unsigned long t, volatile unsigned long* dataArray, byte numData);
-	unsigned long sendData(char* tag, unsigned long t, volatile float* dataArray, byte numData);
+	// Format and send data message
+	unsigned long sendData(const char* tag, unsigned long t = millis());
+	unsigned long sendData(const char* tag, unsigned long t, volatile byte num);
+	unsigned long sendData(const char* tag, unsigned long t, volatile int num);
+	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned int num);
+	unsigned long sendData(const char* tag, unsigned long t, volatile long num);
+	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned long num);
+	unsigned long sendData(const char* tag, unsigned long t, volatile float num);
+	unsigned long sendData(const char* tag, unsigned long t, volatile byte* dataArray, byte numData);
+	unsigned long sendData(const char* tag, unsigned long t, volatile int* dataArray, byte numData);
+	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned int* dataArray, byte numData);
+	unsigned long sendData(const char* tag, unsigned long t, volatile long* dataArray, byte numData);
+	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned long* dataArray, byte numData);
+	unsigned long sendData(const char* tag, unsigned long t, volatile float* dataArray, byte numData);
+
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t = millis());
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte num);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile int num);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int num);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile long num);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long num);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile float num);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte* dataArray, byte numData);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile int* dataArray, byte numData);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int* dataArray, byte numData);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile long* dataArray, byte numData);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long* dataArray, byte numData);
+	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile float* dataArray, byte numData);
 
 
 
