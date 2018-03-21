@@ -1,15 +1,21 @@
 ManyRig		KEYWORD1
-setDelimiter	KEYWORD2
-getDelimiter	KEYWORD2
-getInputValue	KEYWORD2
-getCmdString	KEYWORD2
-attachParser	KEYWORD2
-detachParser	KEYWORD2
-getInputIndex	KEYWORD2
-serialRead	KEYWORD2
-delay	KEYWORD2
-delayUntil	KEYWORD2
-delayContinue	KEYWORD2
-sendHeader	KEYWORD2
-sendData	KEYWORD2
-sendNumTTL	KEYWORD2
+
+lickDetectorPin	KEYWORD2
+pawDetectorPin	KEYWORD2
+waterValvePin	KEYWORD2
+speakerPin	KEYWORD2
+airPuffPin	KEYWORD2
+odorEmptyPin	KEYWORD2
+odorPins	KEYWORD2
+syncPin		KEYWORD2
+camPin		KEYWORD2
+
+isPawOn		KEYWORD2
+isLickOn	KEYWORD2
+playTone	KEYWORD2
+playSweep	KEYWORD2
+playNoise	KEYWORD2
+deliverWater	KEYWORD2
+deliverOdor	KEYWORD2
+deliverAirPuff	KEYWORD2
+choose		KEYWORD2

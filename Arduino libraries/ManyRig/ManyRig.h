@@ -1,94 +1,47 @@
 /*
-ManyRig.h - Library facilitating the control of behaviral experiments.
-Created by Duo Xu, September 24, 2016.
-Released into the public domain.
+ManyRig.h - Library for rig specific utilities.
+Created by Duo Xu, November 23, 2017.
 */
 
 #ifndef ManyRig_h
 #define ManyRig_h
 
-
-
 #include "Arduino.h"
-#include "boardnames.h"
-
-
 
 class ManyRig
 {
 public:
 	ManyRig();
 
-	void setDelimiter(char d);
-	char getDelimiter();
+	// Pin-out (values defined in constructor)
+	byte lickDetectorPin;
+	byte pawDetectorPin;
 
-	
+	byte waterValvePin;
+	byte speakerPin;
+	byte airPuffPin;
+	byte odorEmptyPin;
+	byte odorPins[2];
+	byte syncPin;
+	byte camPin;
+	byte randPin;
 
-	// Handling incoming messages
-	void attachParser(void(*f)(void));
-	void detachParser();
-	unsigned int getInputIndex();
-	unsigned long getInputValue();
-	String getCmdString();
+	// IO
+	bool isPawOn();
+	bool isLickOn();
+	void playTone(unsigned int freq, unsigned long durInMs);
+	void playSweep(unsigned int freqStart, unsigned int freqEnd, unsigned long durInMs);
+	void playNoise(unsigned long durInMs);
+	void deliverWater(unsigned long durInMs);
+	void deliverOdor(byte odorId, unsigned long durInMs);
+	void deliverAirPuff(unsigned long durInMs);
+	void sendNumTTL(unsigned long num);
+	void sendNumTTL(byte pin, unsigned long num);
 
-	void serialRead();
-	void delay(unsigned long dur);
-	bool delayUntil(bool(*f)(void));
-	bool delayUntil(bool(*f)(void), unsigned long timeout);
-	bool delayContinue(bool(*f)(void), unsigned long unitTime);
+	// Computing
+	byte choose(byte* probVector, byte numChoices);
 
-
-
-	// Sending formatted data message
-	void attachSender(void(*f)(String));
-
-	// Format and send data message
-	unsigned long sendData(const char* tag, unsigned long t = millis());
-	unsigned long sendData(const char* tag, unsigned long t, volatile byte num);
-	unsigned long sendData(const char* tag, unsigned long t, volatile int num);
-	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned int num);
-	unsigned long sendData(const char* tag, unsigned long t, volatile long num);
-	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned long num);
-	unsigned long sendData(const char* tag, unsigned long t, volatile float num);
-	unsigned long sendData(const char* tag, unsigned long t, volatile byte* dataArray, byte numData);
-	unsigned long sendData(const char* tag, unsigned long t, volatile int* dataArray, byte numData);
-	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned int* dataArray, byte numData);
-	unsigned long sendData(const char* tag, unsigned long t, volatile long* dataArray, byte numData);
-	unsigned long sendData(const char* tag, unsigned long t, volatile unsigned long* dataArray, byte numData);
-	unsigned long sendData(const char* tag, unsigned long t, volatile float* dataArray, byte numData);
-
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t = millis());
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte num);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile int num);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int num);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile long num);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long num);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile float num);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte* dataArray, byte numData);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile int* dataArray, byte numData);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int* dataArray, byte numData);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile long* dataArray, byte numData);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long* dataArray, byte numData);
-	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile float* dataArray, byte numData);
-
-
-
-	// Control I/O
-	unsigned long sendNumTTL(byte pin, unsigned long num);
-
-
-protected:
-	// Parsing
-	char _delimiter = ',';
-	unsigned int _numDelimiter = 0;
-	unsigned long _inputVal = 0;
-	String _cmdString = String();
-	void (*_parserFunc)(void) = NULL;
-
-	// Sending
-	void (*_senderFunc)(String) = serialSend;
-
-	static void serialSend(String);
+private:
 
 };
 

@@ -1,39 +1,44 @@
 /*
-SatelliteRig.h - Library for the embedded part of Project Satellites.
-Created by Duo Xu, September 18, 2016.
+Satellites.h - Library facilitating the control of behavioral experiments.
+Created by Duo Xu, September 24, 2016.
+Latest update on November 24, 2017.
 Released into the public domain.
 */
 
-#ifndef SatelliteRig_h
-#define SatelliteRig_h
+#ifndef Satellites_h
+#define Satellites_h
+
+
 
 #include "Arduino.h"
-#include "WString.h"
-#include "Printers.h"
-#include "XBee.h"
-
-#include "ManyRig.h"
+#include "boardnames.h"
 
 
-
-const byte TRANSPARENT_MODE = 0;
-const byte API_MODE = 1;
-
-
-
-class SatelliteRig: public ManyRig
+class Satellites
 {
 public:
-	// Constructor
-	SatelliteRig(byte id);
+	Satellites();
 
-	// Rig info
-	byte getRigId();
-	void setCommunicationMode(byte modeId);
+	void setDelimiter(char d);
+	char getDelimiter();
 
 	// Handling incoming messages
-	unsigned int getInputIndex();
+	void attachReader(void(*f)(void));
+	void detachReader();
+	unsigned int getIndex();
+	unsigned long getValue();
+	String getCmdName();
+
 	void serialRead();
+	void serialReadCmd();
+	void delay(unsigned long dur);
+	bool delayUntil(bool(*f)(void));
+	bool delayUntil(bool(*f)(void), unsigned long timeout);
+	bool delayContinue(bool(*f)(void), unsigned long unitTime);
+
+	// Sending formatted data message
+	void setSerial(usb_serial_class* s);
+	void setSerial(HardwareSerial* s);
 
 	// Format and send data message
 	unsigned long sendData(const char* tag, unsigned long t = millis());
@@ -64,34 +69,19 @@ public:
 	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long* dataArray, byte numData);
 	unsigned long sendData(const __FlashStringHelper* tag, unsigned long t, volatile float* dataArray, byte numData);
 
+protected:
+	// Parsing
+	char _delimiter = ',';
+	unsigned int _numDelimiter = 0;
+	long _inputVal = 0;
+	long _inputSign = 1;
+	String _cmdString = String();
+	void (*_parserFunc)(void) = NULL;
 
-private:
-	// Rig variables
-	byte _rigId = 255;
-	byte _communicationMode = TRANSPARENT_MODE;
-	bool _isWaiting = true;			// a flag used for parsing incoming address (i.e. rig ID) but not wasting time on irrelevant stuff
+	// Sending
+	Stream* _serial = &Serial;
+	void serialSend(String);
 
-	// Create the XBee object
-	XBee xbee = XBee();
-	XBeeResponse response = XBeeResponse();
-	XBeeAddress64 addr64 = XBeeAddress64(0x00000000, 0x00000000);	// SH + SL address of the coordinator
-
-	// Create reusable response objects for responses we expect to handle
-	ZBRxResponse rx = ZBRxResponse();
-	ZBTxStatusResponse txStatus = ZBTxStatusResponse();
-	ModemStatusResponse msr = ModemStatusResponse();
-
-
-
-	// General character parser
-	void parseChar(char ch);
-
-	// Read a XBee frame
-	String readXBeeFrame();
-
-	// Sending formatted data message
-	void sendString(String msg);
-	void sendXBeeFrame(String msg);
 };
 
 #endif

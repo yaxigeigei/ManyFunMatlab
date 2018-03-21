@@ -1,666 +1,149 @@
 /*
-ManyRig.h - Library facilitating the control of behaviral experiments.
-Created by Duo Xu, September 24, 2016.
-Released into the public domain.
+ManyRig.cpp - Library for rig specific utilities.
+Created by Duo Xu, November 23, 2017.
 */
 
 #include "Arduino.h"
 #include "ManyRig.h"
 
+ManyRig::ManyRig()
+{
+	// Define pins in array
+	lickDetectorPin = 14;
+	pawDetectorPin = 15;
 
+	waterValvePin = 4;
+	speakerPin = 6;
+	airPuffPin = 16;
+	odorEmptyPin = 17;
+	odorPins[0] = 18;
+	odorPins[1] = 19;
+	syncPin = 22;
+	camPin = 23;
+	randPin = 28;
 
-ManyRig::ManyRig() {
-	// do nothing
+	// Setup pin mode
+	pinMode(lickDetectorPin, INPUT);
+	pinMode(pawDetectorPin, INPUT);
+
+	pinMode(waterValvePin, OUTPUT);
+	pinMode(speakerPin, OUTPUT);
+	pinMode(airPuffPin, OUTPUT);
+	pinMode(odorEmptyPin, OUTPUT);
+	pinMode(odorPins[0], OUTPUT);
+	pinMode(odorPins[1], OUTPUT);
+	pinMode(syncPin, OUTPUT);
+	pinMode(camPin, OUTPUT);
+
+	// Set random seed from an unused analog pin
+	randomSeed(randPin);
 }
 
-void ManyRig::setDelimiter(char d) {
-	_delimiter = d;
+bool ManyRig::isPawOn()
+{
+	return digitalRead(pawDetectorPin) == HIGH;
 }
 
-char ManyRig::getDelimiter() {
-	return _delimiter;
+bool ManyRig::isLickOn()
+{
+	return digitalRead(lickDetectorPin) == HIGH;
 }
 
-
-
-void ManyRig::attachParser(void(*f)(void)) {
-	_parserFunc = f;
+void ManyRig::playTone(unsigned int freq, unsigned long durInMs)
+{
+	if (durInMs > 0) {
+		tone(speakerPin, freq, durInMs);
+		delay(durInMs);
+	}
 }
 
-void ManyRig::detachParser() {
-	_parserFunc = NULL;
-}
+void ManyRig::playSweep(unsigned int freqStart, unsigned int freqEnd, unsigned long durInMs)
+{
+	unsigned int dT = 10;
+	unsigned int numSteps = durInMs / dT;
+	unsigned int dFreq = (freqEnd - freqStart) / numSteps;
 
-unsigned int ManyRig::getInputIndex() {
-	return _numDelimiter;
-}
+	unsigned long t0 = millis();
+	unsigned int currentStep = 0;
 
-unsigned long ManyRig::getInputValue() {
-	return _inputVal;
-}
-
-String ManyRig::getCmdString() {
-	return _cmdString;
-}
-
-void ManyRig::serialRead() {
-	// Handle command identification and dispatching
-
-	if (Serial.available())
+	while (currentStep < numSteps)
 	{
-		// Read byte as char
-		char ch = Serial.read();
-
-		if (isDigit(ch))
+		if (millis() - t0 >= dT)
 		{
-			// Accumulate digits to assemble the incoming value
-			_inputVal = _inputVal * 10 + ch - '0';
-		}
-		else if (isAlpha(ch))
-		{
-			// Accumulate letters to assemble the incoming string
-			_cmdString += ch;
-		}
-		else if (ch == _delimiter || isControl(ch))
-		{
-			// Parse command and incoming value
-			if (_parserFunc != NULL && _cmdString.length() > 0)
-				_parserFunc();
-
-			// Clear incoming value of the current input
-			_inputVal = 0;
-		}
-
-		// Keep track of the number of delimiters for indexing inputs
-		if (ch == _delimiter)
-			_numDelimiter++;
-
-		// Reset reader state for identification
-		if (isControl(ch))
-		{
-			_inputVal = 0;
-			_cmdString = "";
-			_numDelimiter = 0;
+			currentStep++;
+			t0 = millis();
+			tone(speakerPin, freqStart + currentStep * dFreq);
 		}
 	}
+	noTone(speakerPin);
 }
 
+void ManyRig::playNoise(unsigned long durInMs)
+{
+	unsigned long dur = durInMs * 1e3;
+	unsigned long t = micros();
 
+	while (micros() - t < dur)
+		digitalWrite(speakerPin, random(2));
 
-void ManyRig::delay(unsigned long dur) {
-	// Delay and read serial command
-
-	unsigned long t0 = millis();
-	while (millis() - t0 < dur)
-		serialRead();
+	digitalWrite(speakerPin, LOW);
 }
 
-bool ManyRig::delayUntil(bool(*f)(void)) {
-	// Delay and read serial command until function returns true
-
-	bool b = false;
-
-	while (!b) {
-		serialRead();
-		b = f();
-	}
-
-	return b;
+void ManyRig::deliverWater(unsigned long durInMs)
+{
+	digitalWrite(waterValvePin, HIGH);
+	delay(durInMs);
+	digitalWrite(waterValvePin, LOW);
 }
 
-bool ManyRig::delayUntil(bool(*f)(void), unsigned long timeout) {
-	// Delay and read serial command until function returns true or timeout
-
-	bool b = false;
-
-	unsigned long t0 = millis();
-	while (millis() - t0 < timeout && !b) {
-		serialRead();
-		b = f();
-	}
-
-	return b;
+void ManyRig::deliverOdor(byte odorId, unsigned long durInMs)
+{
+	digitalWrite(odorPins[odorId], HIGH);
+	digitalWrite(odorEmptyPin, HIGH);
+	delay(durInMs);
+	digitalWrite(odorEmptyPin, LOW);
+	digitalWrite(odorPins[odorId], LOW);
 }
 
-bool ManyRig::delayContinue(bool(*f)(void), unsigned long unitTime) {
-	// Delay and read serial command. Reiterates delay when function returns true
-
-	bool b = false;
-	unsigned long t0 = millis();
-	unsigned long t = t0;
-
-	while (millis() - t < unitTime) {
-		serialRead();
-		if (f()) {
-			t = millis();
-			b = true;
-		}
-	}
-
-	return b;
+void ManyRig::deliverAirPuff(unsigned long durInMs)
+{
+	digitalWrite(airPuffPin, HIGH);
+	delay(durInMs);
+	digitalWrite(airPuffPin, LOW);
 }
 
-
-
-void ManyRig::attachSender(void(*f)(String)) {
-	if (f != NULL)
-		_senderFunc = f;
+void ManyRig::sendNumTTL(unsigned long num)
+{
+	// Send integer via TTL. The duration equals the number times 1000us.
+	sendNumTTL(syncPin, num);
 }
 
-void ManyRig::serialSend(String msg) {
-	Serial.println(msg);
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t) {
-	// Send data message with the header
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile byte num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile int num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned int num) {
-	// Send data message by event type, time, and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile long num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned long num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile float num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile byte* dataArray, byte numData) {
-	// Send data message with the header and an array of bytes, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile int* dataArray, byte numData) {
-	// Send data message with the header and an array of ints, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned int* dataArray, byte numData) {
-	// Send data message with the header and an array of unsigned ints, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile long* dataArray, byte numData) {
-	// Send data message with the header and an array of long integers, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile unsigned long* dataArray, byte numData) {
-	// Send data message with the header and an array of unsigned long integers, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const char* tag, unsigned long t, volatile float* dataArray, byte numData) {
-	// Send data message with the header and an array of floating point numbers, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t) {
-	// Send data message with the header
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile int num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int num) {
-	// Send data message by event type, time, and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile long num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile float num) {
-	// Send data message with the header and value
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-	msg += _delimiter;
-	msg += num;
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile byte* dataArray, byte numData) {
-	// Send data message with the header and an array of bytes, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile int* dataArray, byte numData) {
-	// Send data message with the header and an array of ints, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned int* dataArray, byte numData) {
-	// Send data message with the header and an array of unsigned ints, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile long* dataArray, byte numData) {
-	// Send data message with the header and an array of long integers, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile unsigned long* dataArray, byte numData) {
-	// Send data message with the header and an array of unsigned long integers, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-unsigned long ManyRig::sendData(const __FlashStringHelper* tag, unsigned long t, volatile float* dataArray, byte numData) {
-	// Send data message with the header and an array of floating point numbers, separated by commas
-
-	unsigned long tStart = micros();
-
-	String msg = String();
-
-	msg += tag;
-	msg += _delimiter;
-	msg += t;
-
-	for (int i = 0; i < numData; i++) {
-		msg += _delimiter;
-		msg += dataArray[i];
-	}
-
-	_senderFunc(msg);
-
-	return micros() - tStart;
-}
-
-
-
-unsigned long ManyRig::sendNumTTL(byte pin, unsigned long num) {
-	// Send integer via TTL. The duration equals the number times 100us.
-
-	unsigned long durInUs = num * 1000;
+void ManyRig::sendNumTTL(byte pin, unsigned long num)
+{
+	// Send integer via TTL. The duration equals the number times 1000us.
 
 	digitalWrite(pin, HIGH);
-	delayMicroseconds(durInUs);
+	delayMicroseconds(num * 1000);
 	digitalWrite(pin, LOW);
-
-	return durInUs;
 }
+
+byte ManyRig::choose(byte* probVector, byte numChoices)
+{
+	byte randNum = random(0, 100);
+	int sumProb = 0;
+
+	for (byte i = 0; i < numChoices; i++)
+	{
+		sumProb = sumProb + probVector[i];
+
+		if (i == numChoices - 1)
+			sumProb = 100;
+
+		if (randNum < sumProb)
+			return i;
+	}
+
+	return 0;
+}
+
+
