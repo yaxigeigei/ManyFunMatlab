@@ -1,9 +1,6 @@
 classdef MPlot
-    %MPLOT Summary of this class goes here
-    %   Detailed explanation goes here
-    
-    properties
-    end
+    %MPlot A collection of functions useful for plotting
+    %   
     
     methods(Static)
         function h = BarSurf(v)
@@ -163,21 +160,8 @@ classdef MPlot
         function Figure(n, w, h, varargin)
             % Create or modify a new figure window
             % 
-            %   Figure(h, varargin)
+            %   MPlot.Figure(h, varargin)
             % 
-            
-%             % Handle user input
-%             p = inputParser();
-%             p.addOptional('x', []);
-%             p.addParameter('color', 'k');
-%             p.addParameter('alpha', 0.3, @isnumeric);
-%             p.addParameter('orientation', 'vertical', @(x) any(strcmp(x, {'vertical', 'horizontal'})));
-%             
-%             p.parse(varargin{:});
-%             x = p.Results.x;
-%             color = p.Results.color;
-%             faceAlpha = p.Results.alpha;
-%             ori = p.Results.orientation;
             
             figure(n);
             figPos = get(gcf, 'Position');
@@ -245,7 +229,7 @@ classdef MPlot
         function ax = SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
             % Set an axes with hard-coded positions
             % 
-            %   SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
+            %   MPlot.SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
             %
             
             if numel(panelSize) == 1
@@ -275,28 +259,147 @@ classdef MPlot
             
         end
         
-        function valBar = ScaleBar(data, percentHeight)
+        function barLength = ScaleBar(data, heightRatio)
             % Return the length of a scale bar with appropriate length
             %
-            %   valBar = MPlot.ScaleBar(data, percentHeight)
+            %   barLength = MPlot.ScaleBar(data, heightRatio)
             %
             % Inputs:
-            %   data                Vector of data. 
-            %   percentHeight       Desiered height of the scale bar wrt the percentage of the span of data. 
+            %   data                Numeric array. 
+            %   heightRatio         The desired ratio of the length of scale bar to the span of data. 
+            %                       Default ratio is 0.5.
             % Output:
-            %   valBar              The length of scale bar in the same unit as data. 
+            %   barLength           The length of scale bar in the same unit as data. 
             %
             
             if nargin < 2
-                percentHeight = 0.5;
+                heightRatio = 0.5;
             end
             
             if isvector(data)
                 data = data(:);
             end
             
-            valBarRaw = (max(data) - min(data)) * percentHeight;
-            valBar = round(valBarRaw, 1, 'significant');
+            barLength = (max(data) - min(data)) * heightRatio;
+            barLength = round(barLength, 1, 'significant');
+        end
+        
+        function varargout = PlotPointAsLine(x, y, d, varargin)
+            % Plot points as lines with specified length. It also accepts arguments of Line properties 
+            % like 'line' function. 
+            % 
+            %   MPlot.PlotPointAsLine(x, y, d)
+            %   MPlot.PlotPointAsLine(..., 'Orientation', 'vertical')
+            %   MPlot.PlotPointAsLine(..., 'LinePropertyName', value)
+            %   hh = MPlot.PlotPointAsLine(...)
+            % 
+            % Inputs
+            %   x                   x coordinates of line centers. 
+            %   y                   y coordinates of line centers. 
+            %   d                   Length of lines. It can be a scalar or an array for each line. 
+            %   'Orientation'       The orientation of lines. Default is 'vertical'.
+            %   Any PropertyName-Value pair for MATLAB built-in 'line' function. 
+            % 
+            % Output
+            %   hh                  Handles of Line objects
+            % 
+            
+            p = inputParser();
+            p.KeepUnmatched = true;
+            p.addParameter('Orientation', 'vertical', @(x) any(strcmpi(x, {'vertical', 'horizontal'})));
+            
+            p.parse(varargin{:});
+            orientationStr = p.Results.Orientation;
+            
+            varargin = p.Unmatched;
+            
+            x = x(:);
+            y = y(:);
+            d = d(:);
+            
+            if strcmpi(orientationStr, 'horizontal')
+                hh = line([x-d/2, x+d/2]', [y, y]', varargin);
+            else
+                hh = line([x, x]', [y-d/2, y+d/2]', varargin);
+            end
+            
+            if nargout == 1
+                varargout{1} = hh;
+            end
+        end
+        
+        function varargout = PlotTraceLadder(xx, yy, pos, varargin)
+            % Plot traces as a ladder
+            % 
+            %   MPlot.PlotTraceLadder(xx, yy, pos)
+            %   MPlot.PlotTraceLadder(..., 'ColorArray', [])
+            %   MPlot.PlotTraceLadder(..., 'TraceFun', [])
+            %   MPlot.PlotTraceLadder(..., 'LinePropertyName', value)
+            %   hh = MPlot.PlotTraceLadder(...)
+            % 
+            % Inputs:
+            %   xx                  1) A vector of x coordinates for all traces in yy. 
+            %                       2) A matrix of x coordinates for every point in yy.
+            %   yy                  Original y coordinates for each trace in column. 
+            %   pos                 Y position of each trace's zero after shifting them into a ladder. 
+            %   'ColorArray'        1) An n-by-3 array of RGB colors. n is the number of traces. 
+            %                       2) An n-by-4 array of RGBA colors. 'A'(alpha) controls transparency. 
+            %                       3) An n-element char vector of colors. (e.g. 'k', 'r', 'm')
+            %   'TraceFun'          A function handle that process each trace in yy. This function must not change
+            %                       the number of elements in each trace. 
+            %   Any PropertyName-Value pair for MATLAB built-in 'line' function. 
+            % 
+            % Output:
+            %   hh                  Handles of plotted line objects. 
+            %
+            
+            % Handle inputs
+            p = inputParser();
+            p.KeepUnmatched = true;
+            p.PartialMatching = false;
+            
+            p.addParameter('ColorArray', [], @isnumeric);
+            p.addParameter('TraceFunc', [], @(x) isa(x,'function_handle'));
+            
+            p.parse(varargin{:});
+            colorArray = p.Results.ColorArray;
+            traceFunc = p.Results.TraceFunc;
+            
+            varargin = p.Unmatched;
+            
+            % Prepare data
+            if isvector(yy)
+                yy = yy(:);
+            end
+            
+            if isvector(xx)
+                xx = repmat(xx(:), 1, size(yy,2));
+            end
+            
+            if ~isempty(traceFunc)
+                for i = 1 : size(yy,2)
+                    yy(:,i) = traceFunc(yy(:,i));
+                end
+            end
+            
+            pos = pos(:)';
+            
+            % Plot traces
+            hh = plot(xx, yy+pos, varargin);
+            
+            if ~isempty(colorArray)
+                if isvector(colorArray)
+                    colorArray = colorArray(:);
+                end
+                
+                for i = 1 : length(hh)
+                    hh(i).Color = colorArray(i,:);
+                end
+            end
+            
+            if nargout == 1
+                varargout{1} = hh;
+            end
         end
     end
     

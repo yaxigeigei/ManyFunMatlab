@@ -1,4 +1,4 @@
-classdef Img34 < ManyFuncImgBaseClass
+classdef Img34 < MImgBaseClass
     %IMAGE234 Summary of this class goes here
     %   Detailed explanation goes here
     

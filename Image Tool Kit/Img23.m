@@ -1,4 +1,4 @@
-classdef Img23 < ManyFuncImgBaseClass
+classdef Img23 < MImgBaseClass
     %IMAGE23 Summary of this class goes here
     %   Detailed explanation goes here
     
@@ -336,14 +336,6 @@ classdef Img23 < ManyFuncImgBaseClass
             
             img = cast(img, dataType);
         end
-    end
-    
-    
-    
-    methods(Static, Access = private)
-        
-        
-        
     end
     
 end

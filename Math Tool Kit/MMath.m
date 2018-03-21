@@ -1,33 +1,21 @@
 classdef MMath
-    %MMATH Summary of this class goes here
-    %   Detailed explanation goes here
-    
-    properties
-    end
+    %MMath A collection of functions useful for doing math and manipulating data
+    %   
     
     methods(Static)
-        function [ci, statDist] = BootCI(nboot, bootfun, vect, varargin)
-            %Removes outliers
+        function [ci, btDist] = BootCI(nboot, bootfun, vect, varargin)
+            %Bootstrap confidence interval similar to the built-in bootci function but faster
             %
-            %   [ vect, indKept, lims ] = RemoveOutliers(vect)
-            %   [ vect, indKept, lims ] = RemoveOutliers(vect, boundParam)
-            %   [ vect, indKept, lims ] = RemoveOutliers(vect, boundParam, method)
+            %   [ci, btDist] = BootCI(nboot, bootfun, vect)
+            %   [ci, btDist] = BootCI(nboot, bootfun, vect, 'alpha', 0.05)
             %
             % Inputs:
-            %   vect            A vector of numeric data
-            %   boundParam      Either (1) a positive scaler of the number of deviation or (2) a tuple specifying the 
-            %                   numbers of deviation on each side respectively (e.g. [ numLower, numUpper ]).
-            %                   The default for standard deviation is [ 3 3 ], for whisker is [ 1.5 1.5 ], for
-            %                   percentile is [ 0.1 0.1 ].
-            %   method          'std' for removal based on the number of standard deviation (default); 
-            %                   'whisker' based on the number of difference of 25 to 75 percentile value (same 
-            %                   convention as MATLAB's built-in whisker plot);
-            %                   'percentile' removes the specified lower and upper percentage of data; 
-            %                   'cut' uses actual cutoff thresholds to remove outliers.
+            %   nboot           Number of resampling.
+            %   bootfun         Function handle for computation. 
+            %   vect            Data to be sent into bootfun.
             % Output: 
-            %   vect            The vector without outliers
-            %   indKept         The binary indices of values being kept
-            %   lims            A tuple containing values of lower and upper limit used for removal
+            %   ci              Confidence interval.
+            %   btDist          The distribution of computed values from bootstrap.
             
             % Handles user inputs
             p = inputParser();
@@ -35,11 +23,10 @@ classdef MMath
             p.parse(varargin{:});
             a = p.Results.alpha * 100;
             
-            statDist = bootstrp(nboot, bootfun, vect);
+            btDist = bootstrp(nboot, bootfun, vect);
             
-            ci(1,1) = prctile(statDist, a/2);
-            ci(2,1) = prctile(statDist, 100-a/2);
-            
+            ci(1,1) = prctile(btDist, a/2);
+            ci(2,1) = prctile(btDist, 100-a/2);
         end
         
         function val = Bound(val, valRange)
@@ -195,7 +182,6 @@ classdef MMath
             end
             
             mask(ind) = true;
-            
         end
         
         function [ data, maskNaN ] = InterpNaN(data)
@@ -390,11 +376,10 @@ classdef MMath
             %Normalizes 2D array so that the maximal value or amplitude is
             %one and the minimal value is zero
             %
-            %   [ data, factors ] = MMath.Normalize(data)
-            %   [ data, factors ] = MMath.Normalize(data, keepSign)
+            %   [ data, factors, offset ] = MMath.Normalize2(data)
             %   
             % Inputs:
-            %   data            numeric array
+            %   data            Numeric array
             %   keepSign        Whether to keep the original sign of the data, i.e. normalize the maximal
             %                   amplitude to one (rather than absolute value). (default is true)
             % Output: 

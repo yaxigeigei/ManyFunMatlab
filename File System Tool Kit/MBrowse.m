@@ -1,22 +1,20 @@
-classdef Browse
-    %BROWSE a convenient combination and extention of uigetfile/uigetdir and fileparts
+classdef MBrowse
+    % A convenient combination and extention of uigetfile/uigetdir and fileparts
+    % (Browse class will be removed in the future)
     %   
-    %   Browse.File()
-    %   Browse.Files()
-    %   Browse.Folder()
+    %   MBrowse.File()
+    %   MBrowse.Files()
+    %   MBrowse.Folder()
     %
-    
-    properties
-    end
     
     methods(Static)
         function [ filePath, folderPath, bareName, ext ] = File(defaultFolderPath, dialogTitle, filterSpec)
             % Browse to select a file and get path parts
             %
-            %   [ filePath, folderPath, bareName, ext ] = Browse.File()
-            %   [ filePath, folderPath, bareName, ext ] = Browse.File(defaultFolderPath)
-            %   [ filePath, folderPath, bareName, ext ] = Browse.File(defaultFolderPath, dialogTitle)
-            %   [ filePath, folderPath, bareName, ext ] = Browse.File(defaultFolderPath, dialogTitle, filterSpec)
+            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File()
+            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File(defaultFolderPath)
+            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File(defaultFolderPath, dialogTitle)
+            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File(defaultFolderPath, dialogTitle, filterSpec)
             %
             
             % Handle user inputs
@@ -66,10 +64,10 @@ classdef Browse
         function [ filePath, folderPath, bareNames, exts ] = Files(defaultFolderPath, dialogTitle, filterSpec)
             % Browse to select multiple files and get path parts
             %
-            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files()
-            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files(defaultFolderPath)
-            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files(defaultFolderPath, dialogTitle)
-            %   [ filePath, folderPath, bareNames, exts ] = Browse.Files(defaultFolderPath, dialogTitle, filterSpec)
+            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files()
+            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files(defaultFolderPath)
+            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files(defaultFolderPath, dialogTitle)
+            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files(defaultFolderPath, dialogTitle, filterSpec)
             %
             
             % Handle user inputs
@@ -119,9 +117,9 @@ classdef Browse
         function folderPath = Folder(defaultFolderPath, dialogTitle)
             % Browse to select a folder and get path parts
             %
-            %   folderPath = Browse.Folder()
-            %   folderPath = Browse.Folder(defaultFolderPath)
-            %   folderPath = Browse.Folder(defaultFolderPath, dialogTitle)
+            %   folderPath = MBrowse.Folder()
+            %   folderPath = MBrowse.Folder(defaultFolderPath)
+            %   folderPath = MBrowse.Folder(defaultFolderPath, dialogTitle)
             %
             
             % Handle user inputs
