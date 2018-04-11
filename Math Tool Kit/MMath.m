@@ -92,7 +92,7 @@ classdef MMath
             %   H = MMath.Entropy(probDist)
             %   
             % Inputs:
-            %   probDist    A vector of probability values
+            %   probDist    A numeric array of probability values
             % Output: 
             %   H           Entropy in bits
             

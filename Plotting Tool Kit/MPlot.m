@@ -318,10 +318,17 @@ classdef MPlot
             d = d(:);
             
             if strcmpi(orientationStr, 'horizontal')
-                hh = line([x-d/2, x+d/2]', [y, y]', varargin);
+                xx = [x-d/2, x+d/2, NaN(size(x))]';
+                yy = [y, y, NaN(size(y))]';
             else
-                hh = line([x, x]', [y-d/2, y+d/2]', varargin);
+                xx = [x, x, NaN(size(x))]';
+                yy = [y-d/2, y+d/2, NaN(size(y))]';
             end
+            
+            xx = xx(:);
+            yy = yy(:);
+            
+            hh = plot(xx, yy, varargin);
             
             if nargout == 1
                 varargout{1} = hh;
