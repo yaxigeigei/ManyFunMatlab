@@ -68,7 +68,7 @@ classdef TiffNow < matlab.mixin.Copyable
                 this.tifObj = Tiff(this.filePath, 'r');
                 
                 % Gets image dimensions
-                [ this.imgSize(1), this.imgSize(2), this.imgSize(3) ] = GetTiffImageSize(this.tifObj);
+                [ this.imgSize(1), this.imgSize(2), this.imgSize(3) ] = Img23.GetTiffImageSize(this.tifObj);
                 
                 % Gets datatype if not specified by user
                 if isempty(this.dataType)

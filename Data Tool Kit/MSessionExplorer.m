@@ -61,7 +61,7 @@ classdef MSessionExplorer < handle
             this.tot = cell2table(cell(0, length(totHeaders)), 'VariableNames', totHeaders);
         end
         
-        function Info(this)
+        function Show(this)
             % Print a summary of content of this object
             
             disp(this);
@@ -112,6 +112,18 @@ classdef MSessionExplorer < handle
             if isUserData
                 se.userData = this.userData;
             end
+        end
+        
+        function s = Save(this, matPath, varargin)
+            % 
+            
+            s.tableName = this.tableNames;
+            s.tableType = this.tot.tableType;
+            s.referenceTime = this.tot.referenceTime;
+            s.tableData = cellfun(@(x) table2struct(x), this.tot.tableData, 'Uni', false);
+            s.userData = this.userData;
+            
+            save(matPath, '-struct', 's');
         end
         
         function SetTable(this, varargin)
@@ -293,15 +305,13 @@ classdef MSessionExplorer < handle
                     tb = this.tot.tableData{k};
                     
                     for i = 1 : size(tb, 2)
-                        try
-                            if isnumeric(tb{:,i})
-                                % Numeric vector
-                                tb{:,i} = tb{:,i} - refEvent;
-                            else
-                                % Cell vector of numeric vectors
-                                tb{:,i} = cellfun(@(x,r) x-r, tb{:,i}, num2cell(refEvent), 'Uni', false);
-                            end
-                        catch
+                        if isnumeric(tb{:,i})
+                            % Numeric vector
+                            tb{:,i} = tb{:,i} - refEvent;
+                        elseif iscell(tb{:,i})
+                            % Cell vector of numeric vectors
+                            tb{:,i} = cellfun(@(x,r) x-r, tb{:,i}, num2cell(refEvent), 'Uni', false);
+                        else
                             warning(fprintf('Failed to align data in %s column of %s table\n', ...
                                 tb.Properties.VariableNames{i}, this.tableName{k}));
                         end
@@ -311,8 +321,8 @@ classdef MSessionExplorer < handle
                     
                 elseif this.isTimesSeriesTable(k)
                     % For timeSeries table
-                    this.tot.tableData{k}.timeInMs = ...
-                        cellfun(@(x,r) x-r, this.tot.tableData{k}.timeInMs, num2cell(refEvent), 'Uni', false);
+                    this.tot.tableData{k}.time = ...
+                        cellfun(@(x,r) x-r, this.tot.tableData{k}.time, num2cell(refEvent), 'Uni', false);
                 end
                 
                 % Change referenceTime
@@ -438,7 +448,7 @@ classdef MSessionExplorer < handle
                 tWin = this.UnifyTimeWindow(tWin, tbIn, rowInd);
                 
                 % Substitute infinity to trial boundary
-                tBound = cellfun(@(x) x([1 end])', tbIn.timeInMs, 'Uni', false);
+                tBound = cellfun(@(x) x([1 end])', tbIn.time, 'Uni', false);
                 tBound = cell2mat(tBound);
                 isWinInf = isinf(tWin);
                 tWin(isWinInf) = tBound(isWinInf);
@@ -446,7 +456,7 @@ classdef MSessionExplorer < handle
                 % Cache variables for 'bleed'
                 if strcmpi(fillMethod, 'bleed')
                     tWinAbs = tWin + tRef;
-                    tAbs = cellfun(@(x,r) x + r, tbIn.timeInMs, num2cell(tRef), 'Uni', false);
+                    tAbs = cellfun(@(x,r) x + r, tbIn.time, num2cell(tRef), 'Uni', false);
                     tAbsBegin = cellfun(@(x) x(1), tAbs);
                     tAbsEnd = cellfun(@(x) x(end), tAbs);
                 end
@@ -455,17 +465,17 @@ classdef MSessionExplorer < handle
                 for i = rowInd'
                     if strcmpi(fillMethod, 'none')
                         % Find mask
-                        isInWin = tWin(i,1) < tbIn.timeInMs{i} & tbIn.timeInMs{i} < tWin(i,2);
+                        isInWin = tWin(i,1) < tbIn.time{i} & tbIn.time{i} < tWin(i,2);
                         
                         % Direct indexing
                         tbOut{i,:} = cellfun(@(x) x(isInWin,:), tbIn{i,:}, 'Uni', false);
                         
                     elseif strcmpi(fillMethod, 'nan')
                         % Find mask
-                        isInWin = tWin(i,1) < tbIn.timeInMs{i} & tbIn.timeInMs{i} < tWin(i,2);
+                        isInWin = tWin(i,1) < tbIn.time{i} & tbIn.time{i} < tWin(i,2);
                         
                         % Make time stamp vectors in exceeded parts
-                        tData = tbIn.timeInMs{i};
+                        tData = tbIn.time{i};
                         tPerSample = diff(tData(1:2));
                         
                         tPreData = flip(tData(1)-tPerSample : -tPerSample : tWin(i,1))';
@@ -475,7 +485,7 @@ classdef MSessionExplorer < handle
                         tPostData(tPostData < tWin(i,1)) = [];
                         
                         % Indexing and filling
-                        tbOut.timeInMs{i} = [tPreData; tData(isInWin,:); tPostData];
+                        tbOut.time{i} = [tPreData; tData(isInWin,:); tPostData];
                         tbOut{i,2:end} = cellfun( ...
                             @(x) [NaN(length(tPreData), size(x,2)); x(isInWin,:); NaN(length(tPostData), size(x,2))], ...
                             tbIn{i,2:end}, 'Uni', false);
@@ -490,7 +500,7 @@ classdef MSessionExplorer < handle
                         isInWin = cellfun(@(x) tWinAbs(i,1) < x & x < tWinAbs(i,2), tAbs(srcRowInd), 'Uni', false);
                         
                         % Find times
-                        tbOut.timeInMs{i} = cell2mat(cellfun(@(x,y) x(y)-tRef(i), tAbs(srcRowInd), isInWin, 'Uni', false));
+                        tbOut.time{i} = cell2mat(cellfun(@(x,y) x(y)-tRef(i), tAbs(srcRowInd), isInWin, 'Uni', false));
                         
                         % Find data
                         for j = 2 : width(tbIn)
@@ -525,15 +535,15 @@ classdef MSessionExplorer < handle
             if resampleFactor ~= 1
                 for i = 1 : height(tbOut)
                     
-                    tPerSample = diff(tbOut.timeInMs{i}(1:2));
+                    tPerSample = diff(tbOut.time{i}(1:2));
                     tPerSampleNew = tPerSample / resampleFactor;
                     
                     if resampleFactor > 1
-                        tResample = (tbOut.timeInMs{i}(1) : tPerSampleNew : tbOut.timeInMs{i}(end))';
-                        tbOut{i,:} = cellfun(@(x) interp1(tbOut.timeInMs{i}, x, tResample, 'linear'), tbOut{i,:}, 'Uni', false);
+                        tResample = (tbOut.time{i}(1) : tPerSampleNew : tbOut.time{i}(end))';
+                        tbOut{i,:} = cellfun(@(x) interp1(tbOut.time{i}, x, tResample, 'linear'), tbOut{i,:}, 'Uni', false);
                     else
                         tbOut{i,2:end} = cellfun(@(x) decimate(double(x), 1/resampleFactor), tbOut{i,2:end}, 'Uni', false);
-                        tbOut.timeInMs{i} = linspace(tbOut.timeInMs{i}(1)+tPerSampleNew/2, tbOut.timeInMs{i}(end), length(tbOut{i,2}{1}))';
+                        tbOut.time{i} = linspace(tbOut.time{i}(1)+tPerSampleNew/2, tbOut.time{i}(end), length(tbOut{i,2}{1}))';
                     end
                 end
             end
@@ -613,7 +623,7 @@ classdef MSessionExplorer < handle
                 if isnumeric(tbIn{:,i})
                     eventAbsTimes{i} = tbIn{:,i} + tRef;
                 elseif iscell(tbIn{:,i})
-                    eventAbsTimes{i} = cell2mat(cellfun(@(x,r) x + r, tbIn{:,i}, num2cell(tRef), 'Uni', false));
+                    eventAbsTimes{i} = cell2mat(cellfun(@(x,r) x(:) + r, tbIn{:,i}, num2cell(tRef), 'Uni', false));
                 else
                     error('Cannot convert relative time with this data format');
                 end
@@ -666,7 +676,7 @@ classdef MSessionExplorer < handle
         function tWin = UnifyTimeWindow(~, tWin, tb, rowInd)
             % Verify time window(s) and turn it into a standard format
             %
-            %   tWin            A n-by-2 matrix of row vectors indicating the begin and end times.
+            %   tWin            A n-by-2 matrix of row vectors indicating the start and end times.
             %                   When n equals 1, this window is applied to every row. When n equals the height of
             %                   the table or the number of selected rows, each window is applied to respective row.
             %   roiInd          Indices of rows to apply window(s). Default is all rows. 

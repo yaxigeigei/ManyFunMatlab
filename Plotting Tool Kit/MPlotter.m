@@ -231,7 +231,7 @@ classdef MPlotter < handle
             uiTime = str2double(this.gui.timeEdit.String);
             
             dTrial = 1;
-            dTime = 1;
+            dTime = 0.001;
             if any(strcmp(eventdata.Modifier, 'control'))
                 dTrial = dTrial * 2;
                 dTime = dTime * 5;
@@ -365,30 +365,26 @@ classdef MPlotter < handle
                 updateOption = this.plotTable.updateOption{i};
                 
                 % Check the need for update
-                switch updateType
+                switch updateOption
                     case 'time'
-                        if ~strcmp(updateOption, 'time')
-                            continue;
-                        end
+                        % always update
                     case 'trial'
-                        if strcmp(updateOption, 'manual')
+                        if strcmp(updateType, {'time'})
                             continue;
                         end
                     case 'manual'
-                        if ~strcmp(updateOption, 'manual')
+                        if any(strcmp(updateType, {'time', 'trial'}))
                             continue;
                         end
+                    otherwise
+                        continue;
                 end
                 
                 % Run function
-                    if isempty(varName)
-                        funcHandle(axObj);
-                    else
-                        funcHandle(axObj, evalin('base', varName));
-                    end
-                try
-                catch e
-                    throw(e);
+                if isempty(varName)
+                    funcHandle(axObj);
+                else
+                    funcHandle(axObj, evalin('base', varName));
                 end
             end
         end
