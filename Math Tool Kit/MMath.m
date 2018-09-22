@@ -285,7 +285,7 @@ classdef MMath
             jointDist = jointDist / size(randVars,1);
         end
         
-        function boundariesInd = Logical2Boundaries(vect)
+        function boundariesInd = Logical2Bounds(vect)
             %Converts logical(boolean/binary) vector to tuples indicating the bondaries of 1 regions
             %e.g. [ 0 0 0 1 1 1 0 0 1 ] => bondaries [ 4 6; 9 9 ]
             %
@@ -296,6 +296,11 @@ classdef MMath
             % Output: 
             %   bondariesInd    Tuples (each row) indicating the bondaries of 1 regions
             
+            if isempty(vect)
+                boundariesInd = zeros(0,2);
+                return;
+            end
+            
             if isvector(vect)
                 vect = vect(:);
             end
@@ -303,6 +308,15 @@ classdef MMath
             vect = [ zeros(1,size(vect,2)); vect; zeros(1,size(vect,2)) ];
             dVect = diff(vect);
             boundariesInd = [ find(dVect == 1), find(dVect == -1) - 1 ];
+        end
+        
+        function y = Map(x, lowVal, highVal)
+            
+            inMin = nanmin(x(:));
+            inMax = nanmax(x(:));
+            
+            y = (x - inMin) / (inMax - inMin) * (highVal - lowVal) + lowVal;
+            
         end
         
         function I = MutualInfo(jointDist)

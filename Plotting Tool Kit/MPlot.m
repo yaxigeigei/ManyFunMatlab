@@ -26,32 +26,21 @@ classdef MPlot
             %   yRange      Same cnvention as xRange but for Y-axis. 
             %   color       A 1-by-3 matrix of RGB color for uniform coloring or a 3-by-3 matrix of row 
             %               vectors for a gradient of colors. This parameter applies to all blocks. The 
-            %               default color is uniform gray ([.8 .8 .8]). 
-            %   'gradientOrientation'
-            %               The orientation of gradient, 'horizontal' or 'vertical' (default).
+            %               default color is uniform gray ([.9 .9 .9]).
             %
             
             % Handles user inputs
-            p = inputParser();
-            p.addParameter('gradientOrientation', 'vertical', @ischar);
-            p.parse(varargin{:});
-            gradOrient = p.Results.gradientOrientation;
-            
             if nargin < 3
                 % Default color is gray
-                color = [ .8 .8 .8 ];
-            end
-            if isvector(color)
-                % No gradient by default
-                color = repmat(color, 3, 1);
+                color = [.9 .9 .9];
             end
             
             % Convert logical mask to boundaries
             if islogical(xRange)
-                xRange = MMath.Logical2Boundaries(xRange);
+                xRange = MMath.Logical2Bounds(xRange);
             end
             if islogical(yRange)
-                yRange = MMath.Logical2Boundaries(yRange);
+                yRange = MMath.Logical2Bounds(yRange);
             end
             
             % Apply yRange to all xRanges if necessary
@@ -63,9 +52,9 @@ classdef MPlot
             end
             
             % Plots blocks
-            for i = 1 : size(xRange,1)
-                drawShadedRectangle(xRange(i,:), yRange(i,:), color(1,:), color(2,:), color(3,:), gradOrient);
-            end
+            xx = [xRange, flip(xRange,2)]';
+            yy = yRange(:,[1 1 2 2])';
+            patch(xx, yy, color, 'EdgeColor', 'none', varargin{:});
         end
         
         function h = Circle(x, y, r, c)
@@ -87,6 +76,12 @@ classdef MPlot
             py = y-r;
             h = rectangle('Position', [ px py d d ], 'Curvature', [1,1], 'FaceColor', c, 'LineStyle', 'none');
             daspect([ 1 1 1 ]);
+        end
+        
+        function cc = Color2Str(cc)
+            cc = mat2str(cc);
+            cc = strrep(cc(2:end), ' ', ',');
+            cc = strsplit(cc, ';');
         end
         
         function rainbowCode = ColorCodeRainbow(numColors)

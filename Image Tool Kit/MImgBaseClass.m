@@ -331,9 +331,9 @@ classdef MImgBaseClass
         function Viewer(img, varargin)
             % Display image, image stack or stacks in a figure-based viewer for easy browsing
             %
-            %   ManyFuncImgBaseClass.Viewer(img)
-            %   ManyFuncImgBaseClass.Viewer(..., 'delay', 0.03)
-            %   ManyFuncImgBaseClass.Viewer(..., 'userFunc', {@(s,f,d) [], []})
+            %   MImgBaseClass.Viewer(img)
+            %   MImgBaseClass.Viewer(..., 'delay', 0.03)
+            %   MImgBaseClass.Viewer(..., 'userFunc', {@(s,f,d) [], []})
             %
             % Inputs
             %   img                     A two, three or four dimensional array, or a cell array of images (or stacks).
@@ -357,7 +357,9 @@ classdef MImgBaseClass
             %     
             
             % Handle user input
-            img = Img34.Array2Cell(img);
+            if ~iscell(img)
+                img = {img};
+            end
             
             if ~all(cellfun(@(x) isnumeric(x) || islogical(x), img))
                 error('All image data needs to be numeric or logical array.');
@@ -372,11 +374,12 @@ classdef MImgBaseClass
             userFuncArg = p.Results.userFunc(2:end);
             
             % Instruction
-            eval('help ManyFuncImgBaseClass.Viewer');
+            eval('help MImgBaseClass.Viewer');
             
             % Construct UI
             clf;
-            set(gcf, ...
+            fh = gcf;
+            set(fh, ...
                 'WindowScrollWheelFcn', @mouseScroll, ...
                 'WindowKeyPressFcn', @keyPress, ...
                 'WindowKeyReleaseFcn', @keyRelease);
@@ -406,7 +409,7 @@ classdef MImgBaseClass
                     hImg.CData = img{sIdx}(:,:,:,fIdx);
                 end
                 
-                title(hAx, sprintf('stack # %i, frame # %i', sIdx, fIdx));
+                fh.Name = sprintf('stack #%i, frame #%i', sIdx, fIdx);
                 
                 % User function
                 try

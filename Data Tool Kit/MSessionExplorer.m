@@ -61,7 +61,7 @@ classdef MSessionExplorer < handle
             this.tot = cell2table(cell(0, length(totHeaders)), 'VariableNames', totHeaders);
         end
         
-        function Show(this)
+        function Preview(this)
             % Print a summary of content of this object
             
             disp(this);
@@ -106,7 +106,7 @@ classdef MSessionExplorer < handle
             se = MSessionExplorer();
             
             for i = indTableInc
-                se.AddTable(this.tableNames{i}, this.tot.tableType{i}, this.tot.tableData{i}, this.tot.referenceTime{i});
+                se.SetTable(this.tableNames{i}, this.tot.tableData{i}, this.tot.tableType{i}, this.tot.referenceTime{i});
             end
             
             if isUserData
@@ -114,7 +114,35 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function s = Save(this, matPath, varargin)
+        function SE = Merge(this, varargin)
+            % Merge multiple MSessionExplorer objects into one
+            % 
+            %   se = Merge(se1, se2, se3, ...)
+            % 
+            % Input:
+            %   se1, se2, se3, ...      Arbitrary number of MSessionExplorer objects
+            % Output:
+            %   se                      The merged MSessionExplorer object
+            % 
+            
+            % Check user input
+            seArray = [this; cat(1, varargin{:})];
+            
+            % Merging
+            SE = MSessionExplorer();
+            
+            for i = 1 : numel(this.tableNames)
+                tbData = arrayfun(@(x) x.tot.tableData{i}, seArray, 'Uni', false);
+                tbData = cat(1, tbData{:});
+                refTime = arrayfun(@(x) x.tot.referenceTime{i}, seArray, 'Uni', false);
+                refTime = cat(1, refTime{:});
+                SE.SetTable(this.tableNames{i}, tbData, this.tot.tableType{i}, refTime);
+            end
+            
+            SE.userData = this.userData;
+        end
+        
+        function s = Save2Struct(this, matPath, varargin)
             % 
             
             s.tableName = this.tableNames;
@@ -251,6 +279,28 @@ classdef MSessionExplorer < handle
             this.tot(tbName,:) = [];
         end
         
+        function RemoveTrials(this, ind2rm)
+            % Remove trials by indices in all tables
+            
+            % Checking
+            if isempty(this.tot)
+                warning('There is no table to operate on.');
+                return;
+            end
+            if (islogical(ind2rm) && all(ind2rm)) || length(unique(ind2rm)) == this.numTrials
+                error('Cannot remove all trials.');
+            end
+            
+            % Remove trials
+            for k = 1 : height(this.tot)
+                this.tot.tableData{k}(ind2rm,:) = [];
+                if ~isempty(this.tot.referenceTime{k})
+                    this.tot.referenceTime{k}(ind2rm) = [];
+                end
+            end
+            this.originalTrialInd(ind2rm) = [];
+        end
+        
         function AlignTime(this, refEvent, refSourceTableName)
             % Shift time stamps in eventTimes and timeSeries tables wrt the provided reference event name or time values
             % 
@@ -356,13 +406,10 @@ classdef MSessionExplorer < handle
             
             % Sort trials
             for k = 1 : height(this.tot)
-                
                 this.tot.tableData{k} = this.tot.tableData{k}(ind,:);
-                
                 if ~isempty(this.tot.referenceTime{k})
                     this.tot.referenceTime{k} = this.tot.referenceTime{k}(ind);
                 end
-                
             end
         end
         
@@ -465,14 +512,14 @@ classdef MSessionExplorer < handle
                 for i = rowInd'
                     if strcmpi(fillMethod, 'none')
                         % Find mask
-                        isInWin = tWin(i,1) < tbIn.time{i} & tbIn.time{i} < tWin(i,2);
+                        isInWin = tWin(i,1) <= tbIn.time{i} & tbIn.time{i} < tWin(i,2);
                         
                         % Direct indexing
                         tbOut{i,:} = cellfun(@(x) x(isInWin,:), tbIn{i,:}, 'Uni', false);
                         
                     elseif strcmpi(fillMethod, 'nan')
                         % Find mask
-                        isInWin = tWin(i,1) < tbIn.time{i} & tbIn.time{i} < tWin(i,2);
+                        isInWin = tWin(i,1) <= tbIn.time{i} & tbIn.time{i} < tWin(i,2);
                         
                         % Make time stamp vectors in exceeded parts
                         tData = tbIn.time{i};
@@ -492,12 +539,12 @@ classdef MSessionExplorer < handle
                         
                     elseif strcmpi(fillMethod, 'bleed')
                         % Collect source trials (in temporal order)
-                        srcRowInd = find(~(all(tAbsBegin - tWinAbs(i,:) > 0, 2) | all(tAbsEnd - tWinAbs(i,:) < 0, 2)));
+                        srcRowInd = find(~(all(tAbsBegin - tWinAbs(i,:) >= 0, 2) | all(tAbsEnd - tWinAbs(i,:) < 0, 2)));
                         [~, ord] = sort(tRef(srcRowInd));
                         srcRowInd = srcRowInd(ord);
                         
                         % Find mask(s)
-                        isInWin = cellfun(@(x) tWinAbs(i,1) < x & x < tWinAbs(i,2), tAbs(srcRowInd), 'Uni', false);
+                        isInWin = cellfun(@(x) tWinAbs(i,1) <= x & x < tWinAbs(i,2), tAbs(srcRowInd), 'Uni', false);
                         
                         % Find times
                         tbOut.time{i} = cell2mat(cellfun(@(x,y) x(y)-tRef(i), tAbs(srcRowInd), isInWin, 'Uni', false));
@@ -623,7 +670,8 @@ classdef MSessionExplorer < handle
                 if isnumeric(tbIn{:,i})
                     eventAbsTimes{i} = tbIn{:,i} + tRef;
                 elseif iscell(tbIn{:,i})
-                    eventAbsTimes{i} = cell2mat(cellfun(@(x,r) x(:) + r, tbIn{:,i}, num2cell(tRef), 'Uni', false));
+                    eventAbsTimes{i} = cellfun(@(x,r) x(:) + r, tbIn{:,i}, num2cell(tRef), 'Uni', false);
+                    eventAbsTimes{i} = cat(1, eventAbsTimes{i}{:});
                 else
                     error('Cannot convert relative time with this data format');
                 end
@@ -640,7 +688,7 @@ classdef MSessionExplorer < handle
                 
                 for i = rowInd
                     % Find events in time window from all events in j for trial i
-                    evtsHit = evts(evts >= tWin(i,1) & evts <= tWin(i,2));
+                    evtsHit = evts(evts >= tWin(i,1) & evts < tWin(i,2));
                     if isempty(evtsHit)
                         evtsHit = NaN;
                     end

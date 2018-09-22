@@ -3,9 +3,7 @@ classdef MPlotter < handle
     %   Detailed explanation goes here
     
     properties
-        layoutTable;
         plotTable;
-        notes;
     end
     
     properties(Access = private)
@@ -16,18 +14,11 @@ classdef MPlotter < handle
         function this = MPlotter()
             % Constructor of MPlotter
             
-            % Initialize layout table
-            columnNames = {'figureNumber', 'figureObj', 'subplot', 'axesObj', 'functionHandle', 'variableName'};
-            exampleRows = { ...
-                1, [], '3,1,1', [], [], ''; ...
-                1, [], '3,1,2:3', [], [], ''};
-            this.layoutTable = cell2table(exampleRows, 'VariableNames', columnNames);
-            
             % Initialize plot table
-            columnNames = {'axesIdx', 'functionHandle', 'variableName', 'updateOption'};
+            columnNames = {'figureNumber', 'figureObj', 'subplot', 'axesObj', 'functionHandle', 'variableName', 'updateOption'};
             exampleRows = { ...
-                1, @MPlotter.PlotTimeIndicator, '', 'time'; ...
-                2, @MPlotter.PlotTimeIndicator, '', 'trial'};
+                1, [], '3,1,1', [], @MPlotter.PlotTimeIndicator, '', 'time'; ...
+                1, [], '3,1,2:3', [], @MPlotter.PlotTimeIndicator, '', 'trial'};
             this.plotTable = cell2table(exampleRows, 'VariableNames', columnNames);
             
             % Open GUI
@@ -45,7 +36,7 @@ classdef MPlotter < handle
             end
             
             % Window
-            wh = 150; ww = 500;
+            wh = 130; ww = 500;
             uh = 20; uw = 60;
             s = 5;
             
@@ -123,7 +114,7 @@ classdef MPlotter < handle
             
             this.gui.limitEdit1 = uicontrol(this.gui.fig, ...
                 'Style', 'edit', ...
-                'String', '-Inf', ...
+                'String', '0', ...
                 'FontSize', 9, ...
                 'HorizontalAlignment', 'left', ...
                 'Units', 'pixel', ...
@@ -135,7 +126,7 @@ classdef MPlotter < handle
             
             this.gui.limitEdit2 = uicontrol(this.gui.fig, ...
                 'Style', 'edit', ...
-                'String', 'Inf', ...
+                'String', '1', ...
                 'FontSize', 9, ...
                 'HorizontalAlignment', 'left', ...
                 'Units', 'pixel', ...
@@ -162,22 +153,39 @@ classdef MPlotter < handle
             x = 0;
             y = y + uh + s;
             
-            this.gui.noteEdit = uicontrol(this.gui.fig, ...
-                'Style', 'edit', ...
-                'Max', Inf, ...
-                'FontSize', 9, ...
-                'HorizontalAlignment', 'left', ...
-                'Units', 'pixel', ...
-                'Position', [x y ww wh-uh-y]);
-            y = wh-uh;
+            noteStr = [ ...
+                "Shortcuts"; ...
+                "*  Left arrow: go backward in time"; ...
+                "*  Right arrow: go forward in time"; ...
+                "*  Up arrow: decrease trial number"; ...
+                "*  Down arrow: increase trial number"; ...
+                ];
             
-            this.gui.noteMenu = uicontrol(this.gui.fig, ...
-                'Style', 'popupmenu', ...
-                'String', {'Write note in the text box below'}, ...
+            uicontrol(this.gui.fig, ...
+                'Style', 'text', ...
+                'String', arrayfun(@sprintf, noteStr, 'Uni', false), ...
                 'FontSize', 9, ...
                 'HorizontalAlignment', 'left', ...
                 'Units', 'pixel', ...
-                'Position', [x y ww uh]);
+                'Position', [x+2*s y ww/2-2*s wh-s-y]);
+            
+            noteStr = [ ...
+                "Modifiers"; ...
+                "*  None: 1 ms or 1 trial"; ...
+                "*  Ctrl: 5 ms or 2 trial"; ...
+                "*  Shift: 20 ms or 10 trial"; ...
+                "*  Ctrl + Shift: 100 ms or 20 trial"; ...
+                ];
+            
+            x = ww/2;
+            uicontrol(this.gui.fig, ...
+                'Style', 'text', ...
+                'String', noteStr, ...
+                'FontSize', 9, ...
+                'HorizontalAlignment', 'left', ...
+                'Units', 'pixel', ...
+                'Position', [x y ww/2-2*s wh-s-y]);
+            y = wh-uh;
             
             % Update GUI
             this.UpdateRoutine();
@@ -263,9 +271,9 @@ classdef MPlotter < handle
         end
         
         function CloseRequest(this, src, eventdata)
-            for i = 1 : height(this.layoutTable)
+            for i = 1 : height(this.plotTable)
                 try
-                    delete(this.layoutTable.figureObj{i});
+                    delete(this.plotTable.figureObj{i});
                 catch
                 end
             end
@@ -273,30 +281,30 @@ classdef MPlotter < handle
         end
         
         function IntializeLayout(this)
-            % Create figures and axes according to layoutTable
+            % Create figures and axes according to plotTable
             
             isNewFig = false;
             
-            for i = 1 : height(this.layoutTable)
+            for i = 1 : height(this.plotTable)
                 
-                % Unpack variables
-                figNum = this.layoutTable.figureNumber(i);
-                figObj = this.layoutTable.figureObj{i};
-                sp = this.layoutTable.subplot{i};
+                % Unload variables
+                figNum = this.plotTable.figureNumber(i);
+                figObj = this.plotTable.figureObj{i};
+                sp = this.plotTable.subplot{i};
                 sp = eval(['{' sp '}']);
-                axesObj = this.layoutTable.axesObj{i};
-                funcHandle = this.layoutTable.functionHandle{i};
-                varName = this.layoutTable.variableName{i};
+                axesObj = this.plotTable.axesObj{i};
+                funcHandle = this.plotTable.functionHandle{i};
+                varName = this.plotTable.variableName{i};
                 
                 % Make figure if not exsiting
                 if isempty(figObj) || ~ishandle(figObj) || ~isvalid(figObj)
-                    this.layoutTable.figureObj{i} = figure(figNum);
+                    this.plotTable.figureObj{i} = figure(figNum);
                     isNewFig = true;
                 end
                 
                 % Make axes if not exsiting
                 if isempty(axesObj) || ~ishandle(axesObj) || ~isvalid(axesObj)
-                    this.layoutTable.axesObj{i} = subplot(sp{:}, 'Parent', figNum);
+                    this.plotTable.axesObj{i} = subplot(sp{:}, 'Parent', figNum);
                     
                     if ~isempty(funcHandle) && isa(funcHandle, 'function_handle')
                         try
@@ -343,8 +351,7 @@ classdef MPlotter < handle
             for i = 1 : height(this.plotTable)
                 
                 % Unpack plotting variables
-                axIdx = this.plotTable.axesIdx(i);
-                axObj = this.layoutTable.axesObj{axIdx};
+                axObj = this.plotTable.axesObj{i};
                 axObj.UserData.trialNum = trialNum;
                 axObj.UserData.time = timePt;
                 
