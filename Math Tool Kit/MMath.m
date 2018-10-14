@@ -96,7 +96,9 @@ classdef MMath
             % Output: 
             %   H           Entropy in bits
             
-            H = -nansum(probDist(:) .* log2(probDist(:)));
+            probDist = probDist(:);
+            probDist = probDist / nansum(probDist);
+            H = -nansum(probDist .* log2(probDist));
         end
         
         function expect = Expectation(distMat, val, idxDim)
@@ -310,13 +312,15 @@ classdef MMath
             boundariesInd = [ find(dVect == 1), find(dVect == -1) - 1 ];
         end
         
-        function y = Map(x, lowVal, highVal)
+        function y = Map(x, lowIn, highIn, lowOut, highOut)
             
-            inMin = nanmin(x(:));
-            inMax = nanmax(x(:));
-            
-            y = (x - inMin) / (inMax - inMin) * (highVal - lowVal) + lowVal;
-            
+            if isempty(lowIn)
+                lowIn = nanmin(x);
+            end
+            if isempty(highIn)
+                highIn = nanmax(x);
+            end
+            y = (x - lowIn) ./ (highIn - lowIn) .* (highOut - lowOut) + lowOut;
         end
         
         function I = MutualInfo(jointDist)

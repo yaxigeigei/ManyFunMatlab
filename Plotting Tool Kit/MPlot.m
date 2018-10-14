@@ -84,199 +84,169 @@ classdef MPlot
             cc = strsplit(cc, ';');
         end
         
-        function rainbowCode = ColorCodeRainbow(numColors)
-            % Returns a color map based on rainbow spectrum
-            %
-            %   rainbowCode = MPlot.ColorCodeRainbow(numColors)
-            %
-            % Input:
-            %   numColors       The number of colors to return
-            % Output:
-            %   rainbowCode     A series of color in numColors-by-3 matrix ranging from red to violet. 
-            %
-            
-            rainbowBase = { [ 1 1 0 0 0 1 ]; [ 0 1 1 1 0 0 ]; [ 0 0 0 1 1 1 ] };
-            rainbowCode = cellfun(@(x) interp1(1:6, x, linspace(1,6,numColors)), rainbowBase, 'UniformOutput', false);
-            rainbowCode = cell2mat(rainbowCode)';
-        end
-        
-        function ErrorShade(y, err, varargin)
+        function ErrorShade(varargin)
             % Plot error as shading
             % 
             %   MPlot.ErrorShade(y, err)
-            %   MPlot.ErrorShade(y, err, x)
-            %   MPlot.ErrorShade(..., 'orientation', 'vertical')
-            %   MPlot.ErrorShade(..., 'color', 'k')
-            %   MPlot.ErrorShade(..., 'alpha', 0.3)
+            %   MPlot.ErrorShade(x, y, err)
+            %   MPlot.ErrorShade(x, y, errPos, errNeg)
+            %   MPlot.ErrorShade(..., 'IsRelative', true)
+            %   MPlot.ErrorShade(..., 'Orientation', 'vertical')
+            %   MPlot.ErrorShade(..., 'Color', 'k')
+            %   MPlot.ErrorShade(..., 'Alpha', 0.3)
             %
             % Inputs:
-            %   y               Y-coordinates.
-            %   err             Errors, one sided. 
-            %   x               X-coordinates. Default is indices of member in y. 
-            %   'orientation'   Orientation along which err is applied. 'vertical' (default) for Y-axis 
+            %   x               X-coordinates. Default is indices of elements in y. 
+            %   y               Y-coordinates. 
+            %   err             Errors, which apply to both sides. 
+            %   errPos          Errors on the positive side. 
+            %   errNeg          Errors on the negative side.
+            %   'IsRelative'    Logical variable indicate whether (default) or not error inputs are relative to y. 
+            %   'Orientation'   Orientation along which err is applied. 'vertical' (default) for Y-axis 
             %                   and 'horizontal' for X-axis.
-            %   'color'         Color of the shade. Default is black. 
-            %   'alpha'         Transparancy of the shade. Default 0.3. 
+            %   'Color'         Color of the shade. Default is black. 
+            %   'Alpha'         Transparancy of the shade. Default 0.3. 
             %
             
             % Handles user inputs
             p = inputParser();
-            p.addOptional('x', []);
-            p.addParameter('color', 'k');
-            p.addParameter('alpha', 0.3, @isnumeric);
-            p.addParameter('orientation', 'vertical', @(x) any(strcmp(x, {'vertical', 'horizontal'})));
+            p.addRequired('arg1');
+            p.addRequired('arg2');
+            p.addOptional('arg3', []);
+            p.addOptional('arg4', []);
+            p.addParameter('IsRelative', true, @islogical);
+            p.addParameter('Color', 'k');
+            p.addParameter('Alpha', 0.3, @isnumeric);
+            p.addParameter('Orientation', 'vertical', @(x) any(strcmp(x, {'vertical', 'horizontal'})));
             
             p.parse(varargin{:});
-            x = p.Results.x;
-            color = p.Results.color;
-            faceAlpha = p.Results.alpha;
-            ori = p.Results.orientation;
-            
-            if isempty(x)
-                x = 1 : length(y);
+            arg1 = p.Results.arg1;
+            arg2 = p.Results.arg2;
+            arg3 = p.Results.arg3;
+            arg4 = p.Results.arg4;
+            if ~isempty(arg4)
+                x = arg1;
+                y = arg2;
+                errPos = arg3;
+                errNeg = arg4;
+            elseif ~isempty(arg3)
+                x = arg1;
+                y = arg2;
+                errPos = arg3;
+                errNeg = arg3;
+            else
+                y = arg1;
+                x = cumsum(ones(size(y)));
+                errPos = arg2;
+                errNeg = arg2;
             end
+            isRelative = p.Results.IsRelative;
+            color = p.Results.Color;
+            faceAlpha = p.Results.Alpha;
+            ori = p.Results.Orientation;
             
-            x = x(:);
-            y = y(:);
-            err = err(:);
+            if isvector(y)
+                x = x(:);
+                y = y(:);
+                errPos = errPos(:);
+                errNeg = errNeg(:);
+            end
             
             % Ploting
-            if strcmp(ori, 'vertical')
-                patch([ x; flip(x) ], [ y+err; flip(y-err) ], color, ...
-                    'FaceAlpha', faceAlpha, ...
-                    'LineStyle', 'none');
-            else
-                patch([ y+err; flip(y-err) ], [ x; flip(x) ], color, ...
-                    'FaceAlpha', faceAlpha, ...
-                    'LineStyle', 'none');
+            for k = 1 : size(y,2)
+                x = [x(:,k); flip(x(:,k))];
+                if isRelative
+                    err = [y(:,k)+errPos(:,k); flip(y(:,k)-errNeg(:,k))];
+                else
+                    err = [errPos(:,k); flip(errNeg(:,k))];
+                end
+                if strcmp(ori, 'vertical')
+                    patch(x, err, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                else
+                    patch(err, x, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                end
             end
-        end
-        
-        function Figure(n, w, h, varargin)
-            % Create or modify a new figure window
-            % 
-            %   MPlot.Figure(h, varargin)
-            % 
-            
-            figure(n);
-            figPos = get(gcf, 'Position');
-            
-            if ~isempty(w)
-                figPos(3) = w;
-            end
-            
-            if ~isempty(h)
-                figPos(4) = h;
-            end
-            
-            set(gcf, 'Color', 'w', 'Position', figPos);
-            
         end
         
         function Paperize(varargin)
-            % Make an axes comply with conventions of publication
+            % Make axes comply with conventions of publication
             %
             %   MPlot.Paperize(h)
-            %   MPlot.Paperize(h, fontSize)
+            %   MPlot.Paperize(..., 'FontSize', 6)
+            %   MPlot.Paperize(..., 'ColumnsWide', [])
+            %   MPlot.Paperize(..., 'ColumnsHigh', [])
+            %   MPlot.Paperize(..., 'AspectRatio', [])
+            %   MPlot.Paperize(..., 'JournalStyle', 'Cell')
             %
             % Inputs:
-            %   h           Axes handle. Default is the current axes.
+            %   h           Array of Axes or Figure handle(s). Default is the current figure.
+            %               If h is empty, all existing Axes will be operated on. 
             %   fontSize    Font size. Default 6. 
             %
             
             p = inputParser();
-            p.addOptional('h', gca, @ishandle);
-            p.addOptional('fontSize', 6, @isscalar);
+            p.addOptional('h', gcf, @ishandle);
+            p.addParameter('FontSize', 6, @isscalar);
+            p.addParameter('ColumnsWide', [], @isscalar);
+            p.addParameter('ColumnsHigh', [], @isscalar);
+            p.addParameter('AspectRatio', [], @isscalar);
+            p.addParameter('JournalStyle', 'cell', @(x) any(strcmpi(x, {'nature', 'cell'})));
             
             p.parse(varargin{:});
             h = p.Results.h;
-            fontSize = p.Results.fontSize;
+            fontSize = p.Results.FontSize;
+            colsWide = p.Results.ColumnsWide;
+            colsHigh = p.Results.ColumnsHigh;
+            aRatio = p.Results.AspectRatio;
+            journalStyle = lower(p.Results.JournalStyle);
             
-            set(h, 'TickDir', 'out', 'FontSize', fontSize, 'FontName', 'arial');
+            switch journalStyle
+                case 'nature'
+                    widthSet = [8.9 12 18.3];
+                case 'cell'
+                    widthSet = [8.5 11.4 17.4];
+            end
             
-        end
-        
-        function Pcolor(x, y, c)
-            % Pseudocolor plot similar to MATLAB pcolor() but avoids "missing" edges
-            %
-            %   MPlot.Pcolor(x, y, c)
-            %
+            % Resolve figure width
+            if ~isempty(colsWide)
+                % Calculate width by fold of cols
+                figWidth = widthSet(1) * colsWide;
+                
+                % Overwrite if at specific #cols
+                colOpts = [1 1.5 2];
+                optIdx = colsWide == colOpts;
+                if any(optIdx)
+                    figWidth = widthSet(colsWide == colOpts);
+                end
+            end
             
-            x = [x(:); x(end) + diff(x(end-1:end))];
-            y = [y(:); y(end) + diff(y(end-1:end))];
-            c = [c, c(:,end)];
-            c = [c; c(end,:)];
-            
-            pcolor(x, y, c);
-            
-        end
-        
-        function SaveFigure(h, filePath)
-            % Save figure as a PNG file
-            %
-            %   MPlot.SaveFigure(h, filePath)
-            %
-            
-            f = getframe(h);
-            imwrite(frame2im(f), [ filePath '.png' ]);
-        end
-        
-        function ax = SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
-            % Set an axes with hard-coded positions
             % 
-            %   MPlot.SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
-            %
-            
-            if numel(panelSize) == 1
-                panelSize = panelSize([1 1]);
+            if isempty(h)
+                h = findobj('Type', 'Axes');
             end
             
-            if numel(panelSpacing) == 1
-                panelSpacing = panelSpacing([1 1]);
+            for i = 1 : numel(h)
+                if isa(h(i), 'matlab.ui.Figure')
+                    if ~isempty(colsWide)
+                        h(i).Color = 'w';
+                        h(i).Units = 'centimeter';
+                        h(i).Position(3) = figWidth;
+                        if ~isempty(colsHigh)
+                            h(i).Position(4) = figWidth / colsWide * colsHigh;
+                        elseif ~isempty(aRatio)
+                            h(i).Position(4) = figWidth * aRatio;
+                        end
+                    end
+%                     tightfig(h(i));
+                    ax = findobj(h, 'Type', 'Axes');
+                else
+                    ax = h(i);
+                end
+                
+                for j = 1 : numel(ax)
+                    set(ax(j), 'TickDir', 'out', 'FontSize', fontSize, 'FontName', 'arial');
+                end
             end
-            
-            if numel(gridSpacing) == 1
-                gridSpacing = gridSpacing([1 1]);
-            end
-            
-            % Make sure the figure has the right size
-            figSize = gridSpacing*2 + panelSize.*flip(gridSize) + panelSpacing.*flip(gridSize-1);
-            
-            figPos = get(figHandle, 'Position');
-            set(gcf, 'Position', [figPos(1:2), figSize]);
-            
-            % Compute panel parameters
-            panelPos(1) = gridSpacing(1) + (panelCoor(2)-1) * (panelSize(1) + panelSpacing(1));
-            panelPos(2) = figSize(2) - gridSpacing(2) - (panelCoor(1)-1) * (panelSize(2) + panelSpacing(2)) - panelSize(2);
-            
-            ax = axes;
-            set(ax, 'Unit', 'pixel', 'Position', [panelPos, panelSize]);
-            
-        end
-        
-        function barLength = ScaleBar(data, heightRatio)
-            % Return the length of a scale bar with appropriate length
-            %
-            %   barLength = MPlot.ScaleBar(data, heightRatio)
-            %
-            % Inputs:
-            %   data                Numeric array. 
-            %   heightRatio         The desired ratio of the length of scale bar to the span of data. 
-            %                       Default ratio is 0.5.
-            % Output:
-            %   barLength           The length of scale bar in the same unit as data. 
-            %
-            
-            if nargin < 2
-                heightRatio = 0.5;
-            end
-            
-            if isvector(data)
-                data = data(:);
-            end
-            
-            barLength = (max(data) - min(data)) * heightRatio;
-            barLength = round(barLength, 1, 'significant');
         end
         
         function varargout = PlotPointAsLine(x, y, d, varargin)
@@ -403,7 +373,93 @@ classdef MPlot
                 varargout{1} = hh;
             end
         end
+        
+        function cc = Rainbow(numColors)
+            % Returns a color map based on rainbow spectrum
+            %
+            %   cc = MPlot.Rainbow(numColors)
+            %
+            % Input:
+            %   numColors       The number of colors to return
+            % Output:
+            %   cc              A series of color in numColors-by-3 matrix ranging from red to violet. 
+            %
+            
+            cBase = { [ 1 1 0 0 0 1 ]; [ 0 1 1 1 0 0 ]; [ 0 0 0 1 1 1 ] };
+            cc = cellfun(@(x) interp1(1:6, x, linspace(1,6,numColors)), cBase, 'UniformOutput', false);
+            cc = cell2mat(cc)';
+        end
+        
+        function SaveFigure(h, filePath)
+            % Save figure as a PNG file
+            %
+            %   MPlot.SaveFigure(h, filePath)
+            %
+            
+            f = getframe(h);
+            imwrite(frame2im(f), [ filePath '.png' ]);
+        end
+        
+        function barLength = ScaleBar(data, heightRatio)
+            % Return the length of a scale bar with appropriate length
+            %
+            %   barLength = MPlot.ScaleBar(data, heightRatio)
+            %
+            % Inputs:
+            %   data                Numeric array. 
+            %   heightRatio         The desired ratio of the length of scale bar to the span of data. 
+            %                       Default ratio is 0.5.
+            % Output:
+            %   barLength           The length of scale bar in the same unit as data. 
+            %
+            
+            if nargin < 2
+                heightRatio = 0.5;
+            end
+            
+            if isvector(data)
+                data = data(:);
+            end
+            
+            barLength = (max(data) - min(data)) * heightRatio;
+            barLength = round(barLength, 1, 'significant');
+        end
+        
+        function ax = SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
+            % Set an axes with hard-coded positions
+            % 
+            %   MPlot.SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
+            %
+            
+            if numel(panelSize) == 1
+                panelSize = panelSize([1 1]);
+            end
+            
+            if numel(panelSpacing) == 1
+                panelSpacing = panelSpacing([1 1]);
+            end
+            
+            if numel(gridSpacing) == 1
+                gridSpacing = gridSpacing([1 1]);
+            end
+            
+            % Make sure the figure has the right size
+            figSize = gridSpacing*2 + panelSize.*flip(gridSize) + panelSpacing.*flip(gridSize-1);
+            
+            figPos = get(figHandle, 'Position');
+            set(gcf, 'Position', [figPos(1:2), figSize]);
+            
+            % Compute panel parameters
+            panelPos(1) = gridSpacing(1) + (panelCoor(2)-1) * (panelSize(1) + panelSpacing(1));
+            panelPos(2) = figSize(2) - gridSpacing(2) - (panelCoor(1)-1) * (panelSize(2) + panelSpacing(2)) - panelSize(2);
+            
+            ax = axes;
+            set(ax, 'Unit', 'pixel', 'Position', [panelPos, panelSize]);
+        end
     end
     
 end
+
+
+
 
