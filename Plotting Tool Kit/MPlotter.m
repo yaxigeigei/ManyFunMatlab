@@ -171,10 +171,11 @@ classdef MPlotter < handle
             
             noteStr = [ ...
                 "Modifiers"; ...
-                "*  None: 1 ms or 1 trial"; ...
-                "*  Ctrl: 5 ms or 2 trial"; ...
+                "*  None: 5 ms or 1 trial"; ...
+                "*  Alt: 1ms";
+                "*  Ctrl: 10 ms or 2 trial"; ...
                 "*  Shift: 20 ms or 10 trial"; ...
-                "*  Ctrl + Shift: 100 ms or 20 trial"; ...
+                "*  Ctrl + Shift: 400 ms or 20 trial"; ...
                 ];
             
             x = ww/2;
@@ -192,6 +193,50 @@ classdef MPlotter < handle
             
             % Show instruction
 %             eval('help MImgBaseClass.Viewer');
+        end
+        
+        function vidMat = MakeVideo(this, h, dTime, varargin)
+            % 
+            
+            % Handle user inputs
+            p = inputParser();
+            p.addParameter('filePath', [], @ischar);
+            p.addParameter('frameRate', [], @isscalar);
+            p.parse(varargin{:});
+            filePath = p.Results.filePath;
+            frRate = p.Results.frameRate;
+            
+            % Get variables
+            timeLims(1) = str2double(this.gui.limitEdit1.String);
+            timeLims(2) = str2double(this.gui.limitEdit2.String);
+            
+            % Capture frames
+            tFr = timeLims(1) : dTime : timeLims(2);
+            numFr = numel(tFr);
+            vidMat(numFr) = struct('cdata', [], 'colormap', []);
+            
+            for k = 1 : numFr
+                this.UpdateRoutine('time', tFr(k));
+                drawnow;
+                vidMat(k) = getframe(h);
+            end
+            
+            vidMat = cat(4, vidMat.cdata);
+            
+            % Output video
+            if ~isempty(filePath) && ~isempty(frRate)
+                vidObj = VideoWriter(filePath);
+                vidObj.Quality = 95;
+                vidObj.FrameRate = frRate;
+                
+                open(vidObj);
+                try
+                    writeVideo(vidObj, vidMat);
+                catch
+                    close(vidObj);
+                end
+                close(vidObj);
+            end
         end
     end
     
@@ -239,14 +284,17 @@ classdef MPlotter < handle
             uiTime = str2double(this.gui.timeEdit.String);
             
             dTrial = 1;
-            dTime = 0.001;
+            dTime = 0.005;
             if any(strcmp(eventdata.Modifier, 'control'))
                 dTrial = dTrial * 2;
-                dTime = dTime * 5;
+                dTime = dTime * 2;
             end
             if any(strcmp(eventdata.Modifier, 'shift'))
                 dTrial = dTrial * 10;
-                dTime = dTime * 20;
+                dTime = dTime * 4;
+            end
+            if any(strcmp(eventdata.Modifier, 'alt'))
+                dTime = dTime / 5;
             end
             
             switch eventdata.Key
@@ -306,12 +354,12 @@ classdef MPlotter < handle
                 if isempty(axesObj) || ~ishandle(axesObj) || ~isvalid(axesObj)
                     this.plotTable.axesObj{i} = subplot(sp{:}, 'Parent', figNum);
                     
-                    if ~isempty(funcHandle) && isa(funcHandle, 'function_handle')
-                        try
-                            funcHandle(figObj, axesObj, evalin('base', varName));
-                        catch
-                        end
-                    end
+%                     if ~isempty(funcHandle) && isa(funcHandle, 'function_handle')
+%                         try
+%                             funcHandle(figObj, axesObj, evalin('base', varName));
+%                         catch
+%                         end
+%                     end
                 end
             end
             
@@ -395,7 +443,6 @@ classdef MPlotter < handle
                 end
             end
         end
-        
     end
     
     % Hide methods from handle class

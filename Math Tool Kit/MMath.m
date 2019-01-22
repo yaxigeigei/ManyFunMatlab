@@ -1,6 +1,6 @@
 classdef MMath
     %MMath A collection of functions useful for doing math and manipulating data
-    %   
+    %
     
     methods(Static)
         function [ci, btDist] = BootCI(nboot, bootfun, vect, varargin)
@@ -11,9 +11,9 @@ classdef MMath
             %
             % Inputs:
             %   nboot           Number of resampling.
-            %   bootfun         Function handle for computation. 
+            %   bootfun         Function handle for computation.
             %   vect            Data to be sent into bootfun.
-            % Output: 
+            % Output:
             %   ci              Confidence interval.
             %   btDist          The distribution of computed values from bootstrap.
             
@@ -33,13 +33,13 @@ classdef MMath
             %Bounds input values to specified range or allowed members
             %
             %   val = MMath.Bound(val, valRange)
-            %   
+            %
             % Inputs:
             %   val         Numeric scalar, vector or array
             %   valRange    Either (1) a tuple of boundaries (e.g. [ minVal, maxVal ])
             %               or (2) a numeric vector or array of all allowed values (number of elements must > 2) and
             %               each raw input value will be bound to the closest allowed value.
-            % Output: 
+            % Output:
             %   val         Same size as the input val with bound values
             
             if numel(valRange) > 2
@@ -58,11 +58,11 @@ classdef MMath
             %Compute conditional probability distribution from joint distribution
             %
             %   [ condDist, margDist ] = MMath.ConditionalDist(jointDist, givenWhich)
-            %   
+            %
             % Inputs:
             %   jointDist       multidimentional (>=2) array of joint probability
             %   givenWhich      dimentions to condition on (currently has to be ndims(jointDist)-1 dimensions)
-            % Output: 
+            % Output:
             %   condDist        array of conditional distribution
             %   margDist        marginal distribution
             
@@ -90,10 +90,10 @@ classdef MMath
             %Calculates the Shannon's entropy of a given probability distribution
             %
             %   H = MMath.Entropy(probDist)
-            %   
+            %
             % Inputs:
             %   probDist    A numeric array of probability values
-            % Output: 
+            % Output:
             %   H           Entropy in bits
             
             probDist = probDist(:);
@@ -105,7 +105,7 @@ classdef MMath
             %Calculate expected values in the dimension of interest given other variables (assuming gaussian dist.)
             %
             %   expect = MMath.Expectation(distMat, val, idxDim)
-            % 
+            %
             % Inputs:
             %   distMat     Joint probability distribution
             %   val         Values of each probabilities in the dimension of interest
@@ -131,14 +131,14 @@ classdef MMath
             %e.g. indices [ 23; 56 ] with a window of [ -1 0 1 2 ] => ROIs of [ 22 23 24 25; 55 56 57 58 ]
             %
             %   roiInd = MMath.Ind2Roi(ind, winRoi, valRange)
-            %   
+            %
             % Inputs:
             %   ind         An index or a vector of indices
             %   winRoi      A vector of relative indices (not a boundary tuple) indicating the region of interest
             %   valRange    Usually (1) a tuple of indexing boundaries (e.g. [ minIdx, maxIdx ])
             %               or (2) a numeric vector or array of all allowed index values (number of elements must > 2) and
             %               each index will be bound to the closest allowed value.
-            % Output: 
+            % Output:
             %   roiInd      An array where each row is a set of ROI indices for one input index
             %               ROIs causing edge issue are removed from the reuslt.
             
@@ -168,13 +168,13 @@ classdef MMath
         
         function mask = Ind2Logical(ind, vecLength)
             % Convert a vector of indices to logical mask
-            % 
+            %
             %   mask = MMath.Ind2Logical(ind, vecLength)
-            %   
+            %
             % Inputs:
             %   ind         A vector of indices
             %   vecLength   The length of the output vector
-            % Output: 
+            % Output:
             %   mask        A logical vector where elements at 'ind' are true
             
             if isrow(ind)
@@ -190,10 +190,10 @@ classdef MMath
             %Interpolates NaN values in the data
             %
             %   [ data, maskNaN ] = MMath.InterpNaN(data)
-            %   
+            %
             % Inputs:
             %   data	    An array of column vector(s)
-            % Output: 
+            % Output:
             %   data        An array of column vector(s) with NaN values interpolated
             %   maskNaN     The logical mask of NaN values in the original data array
             
@@ -220,22 +220,22 @@ classdef MMath
             % Calculates the joint probability distribution of multiple random variables
             %
             %   [ jointDist, axisLabels, binInd ] = MMath.JointDist(randVars, numBins)
-            %   
+            %
             % Inputs:
-            %   randVars	   	Random variables in an array of column vectors. Each row is an observation. 
-            %   numBins         The number(s) of bins for input random variables. Use NaN to indicate categorical 
+            %   randVars	   	Random variables in an array of column vectors. Each row is an observation.
+            %   numBins         The number(s) of bins for input random variables. Use NaN to indicate categorical
             %                   variable. You may assign different bin numbers to different variables in a
-            %                   vector otherwise they all use the same bin number. 
+            %                   vector otherwise they all use the same bin number.
             %   axisLabels      For categorical variables, you can provide predefined categories (e.g. to account
-            %                   for unobserved values). It expects a 1-by-n cell array where n is the number of 
-            %                   variables in randVars. Each element in this cell array is a vector of numeric 
-            %                   categories along that dimension. 
-            % Output: 
+            %                   for unobserved values). It expects a 1-by-n cell array where n is the number of
+            %                   variables in randVars. Each element in this cell array is a vector of numeric
+            %                   categories along that dimension.
+            % Output:
             %   jointDist       N-dimensional matrix of joint probability. The order of dimensions is the same
             %                   as the order of input variables.
             %   axisLabels      Labels of each axis in cell array.
-            %   binCoor         Each row is a coordinate in the joint distribution sapce for the corresponding 
-            %                   observation (row) in randVars. 
+            %   binCoor         Each row is a coordinate in the joint distribution sapce for the corresponding
+            %                   observation (row) in randVars.
             
             % Handles user inputs
             if nargin < 3
@@ -287,15 +287,112 @@ classdef MMath
             jointDist = jointDist / size(randVars,1);
         end
         
+        function [H, pValue, KSstatistic] = KStest2CDF(ecdf1, ecdf2, varargin)
+            %KSTEST2 Two-sample Kolmogorov-Smirnov goodness-of-fit hypothesis test.
+            
+            if nargin > 2
+                [varargin{:}] = convertStringsToChars(varargin{:});
+            end
+            
+            if nargin < 2
+                error(message('stats:kstest2:TooFewInputs'));
+            end
+            
+            % Parse optional inputs
+            alpha = []; tail = [];
+            if nargin >=3
+                if isnumeric(varargin{1})
+                    % Old syntax
+                    alpha = varargin{1};
+                    if nargin == 4
+                        tail = varargin{2};
+                    end
+                else
+                    % New syntax
+                    params = {'alpha', 'tail'};
+                    dflts =  { []     , []};
+                    [alpha, tail] =...
+                        internal.stats.parseArgs(params, dflts, varargin{:});
+                end
+            end
+            
+            % Ensure each sample is a VECTOR.
+            ecdf1  =  ecdf1(:);
+            ecdf2  =  ecdf2(:);
+            if isempty(ecdf1)
+                error(message('stats:kstest2:NotEnoughData', 'X1'));
+            end
+            if isempty(ecdf2)
+                error(message('stats:kstest2:NotEnoughData', 'X2'));
+            end
+            
+            % Ensure the significance level, ALPHA, is a scalar
+            % between 0 and 1 and set default if necessary.
+            
+            if ~isempty(alpha)
+                if ~isscalar(alpha) || (alpha <= 0 || alpha >= 1)
+                    error(message('stats:kstest2:BadAlpha'));
+                end
+            else
+                alpha  =  0.05;
+            end
+            
+            % Ensure the type-of-test indicator, TAIL, is a string or scalar integer
+            % from the allowable set, and set default if necessary.
+            if ~isempty(tail)
+                if ischar(tail)
+                    try
+                        [~,tail] = internal.stats.getParamVal(tail, ...
+                            {'smaller','unequal','larger'},'Tail');
+                    catch
+                        error(message('stats:kstest2:BadTail'));
+                    end
+                    tail = tail - 2;
+                elseif ~isscalar(tail) || ~((tail==-1) || (tail==0) || (tail==1))
+                    error(message('stats:kstest2:BadTail'));
+                end
+            else
+                tail  =  0;
+            end
+            
+            % Compute the test statistic of interest.
+            switch tail
+                case  0      %  2-sided test: T = max|F1(x) - F2(x)|.
+                    deltaCDF  =  abs(ecdf1 - ecdf2);
+                case -1      %  1-sided test: T = max[F2(x) - F1(x)].
+                    deltaCDF  =  ecdf2 - ecdf1;
+                case  1      %  1-sided test: T = max[F1(x) - F2(x)].
+                    deltaCDF  =  ecdf1 - ecdf2;
+            end
+            KSstatistic   =  max(deltaCDF);
+            
+            % Compute the asymptotic P-value approximation and accept or
+            % reject the null hypothesis on the basis of the P-value.
+            n1     =  length(ecdf1);
+            n2     =  length(ecdf2);
+            n      =  n1 * n2 /(n1 + n2);
+            lambda =  max((sqrt(n) + 0.12 + 0.11/sqrt(n)) * KSstatistic , 0);
+            if tail ~= 0        % 1-sided test.
+                pValue  =  exp(-2 * lambda * lambda);
+            else                % 2-sided test (default).
+                %  Use the asymptotic Q-function to approximate the 2-sided P-value.
+                j       =  (1:101)';
+                pValue  =  2 * sum((-1).^(j-1).*exp(-2*lambda*lambda*j.^2));
+                pValue  =  min(max(pValue, 0), 1);
+            end
+            
+            H  =  (alpha >= pValue);
+        end
+        
         function boundariesInd = Logical2Bounds(vect)
             %Converts logical(boolean/binary) vector to tuples indicating the bondaries of 1 regions
             %e.g. [ 0 0 0 1 1 1 0 0 1 ] => bondaries [ 4 6; 9 9 ]
             %
             %   bondariesInd = Logical2Bondaries(vect)
-            %   
+            %
             % Inputs:
             %   vect            A logical(boolean/binary) vector
-            % Output: 
+            % Output:
             %   bondariesInd    Tuples (each row) indicating the bondaries of 1 regions
             
             if isempty(vect)
@@ -313,7 +410,6 @@ classdef MMath
         end
         
         function y = Map(x, lowIn, highIn, lowOut, highOut)
-            
             if isempty(lowIn)
                 lowIn = nanmin(x);
             end
@@ -327,10 +423,10 @@ classdef MMath
             %Calculates the mutual information of two random variables from their joint probability distribution
             %
             %   I = MMath.MutualInfo(jointDist)
-            %   
+            %
             % Inputs:
             %   jointDist   The joint probability distribution matrix of two random variables
-            % Output: 
+            % Output:
             %   I           Mutual information in bits
             
             marginDist{1} = nansum(jointDist, 2);
@@ -354,12 +450,12 @@ classdef MMath
             %
             %   [ data, factors ] = MMath.Normalize(data)
             %   [ data, factors ] = MMath.Normalize(data, keepSign)
-            %   
+            %
             % Inputs:
             %   data            Column vectors of data array
             %   keepSign        Whether to keep the original sign of the data, i.e. normalize the maximal
             %                   amplitude to one (rather than absolute value). (default is true)
-            % Output: 
+            % Output:
             %   data            Normalized data
             %   factors         Scaling factors used to normalize each column vectors. If the factor is zero,
             %                   eps, the minimal amount of value in MATLAB, is returned.
@@ -395,12 +491,12 @@ classdef MMath
             %one and the minimal value is zero
             %
             %   [ data, factors, offset ] = MMath.Normalize2(data)
-            %   
+            %
             % Inputs:
             %   data            Numeric array
             %   keepSign        Whether to keep the original sign of the data, i.e. normalize the maximal
             %                   amplitude to one (rather than absolute value). (default is true)
-            % Output: 
+            % Output:
             %   data            Normalized data
             %   factors         Scaling factors used to normalize each column vectors. If the factor is zero,
             %                   eps, the minimal amount of value in MATLAB, is returned.
@@ -423,16 +519,16 @@ classdef MMath
             %
             % Inputs:
             %   vect            A vector of numeric data
-            %   boundParam      Either (1) a positive scaler of the number of deviation or (2) a tuple specifying the 
+            %   boundParam      Either (1) a positive scaler of the number of deviation or (2) a tuple specifying the
             %                   numbers of deviation on each side respectively (e.g. [ numLower, numUpper ]).
             %                   The default for standard deviation is [ 3 3 ], for whisker is [ 1.5 1.5 ], for
             %                   percentile is [ 0.1 0.1 ].
-            %   method          'std' for removal based on the number of standard deviation (default); 
-            %                   'whisker' based on the number of difference of 25 to 75 percentile value (same 
+            %   method          'std' for removal based on the number of standard deviation (default);
+            %                   'whisker' based on the number of difference of 25 to 75 percentile value (same
             %                   convention as MATLAB's built-in whisker plot);
-            %                   'percentile' removes the specified lower and upper percentage of data; 
+            %                   'percentile' removes the specified lower and upper percentage of data;
             %                   'cut' uses actual cutoff thresholds to remove outliers.
-            % Output: 
+            % Output:
             %   vect            The vector without outliers
             %   indKept         The binary indices of values being kept
             %   lims            A tuple containing values of lower and upper limit used for removal
@@ -533,10 +629,10 @@ classdef MMath
             %
             %   [ stErr, stDev ] = MMath.StandardError(data)
             %   [ stErr, stDev ] = MMath.StandardError(data, dim)
-            %   
+            %
             % Inputs:
             %   data	    An array of column vector(s)
-            % Output: 
+            % Output:
             %   stErr       Standard error of the population mean
             %   stDev       Standard deviation of the population
             

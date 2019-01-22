@@ -141,11 +141,12 @@ classdef MSessionExplorer < handle
             se = MSessionExplorer();
             
             for i = 1 : numel(this.tableNames)
-                tbData = arrayfun(@(x) x.tot.tableData{i}, seArray, 'Uni', false);
+                tbName = this.tableNames{i};
+                tbData = arrayfun(@(x) x.GetTable(tbName), seArray, 'Uni', false);
                 tbData = cat(1, tbData{:});
-                refTime = arrayfun(@(x) x.tot.referenceTime{i}, seArray, 'Uni', false);
+                refTime = arrayfun(@(x) x.GetReferenceTime(tbName), seArray, 'Uni', false);
                 refTime = cat(1, refTime{:});
-                se.SetTable(this.tableNames{i}, tbData, this.tot.tableType{i}, refTime);
+                se.SetTable(tbName, tbData, this.tot.tableType{i}, refTime);
             end
             
             se.userData = this.userData;
@@ -308,8 +309,12 @@ classdef MSessionExplorer < handle
                 warning('There is no table to get.');
                 return;
             end
-            
-            rt = this.tot{tbName, 'referenceTime'}{1};
+            if nargin < 2
+                hasRt = ~cellfun(@isempty, this.tot.referenceTime);
+                rt = this.tot.referenceTime{find(hasRt,1)};
+            else
+                rt = this.tot{tbName, 'referenceTime'}{1};
+            end
         end
         
         function RemoveTable(this, tbName)
@@ -407,6 +412,10 @@ classdef MSessionExplorer < handle
             if nargin < 4
                 tScale = 1;
             end
+            if isscalar(tScale)
+                tScale = repmat(tScale, [this.numTrials 1]);
+            end
+            tScale = tScale(:);
             
             indAlignable = find(this.isEventTimesTable | this.isTimesSeriesTable);
             if isempty(indAlignable)
@@ -441,10 +450,11 @@ classdef MSessionExplorer < handle
                     for i = 1 : size(tb, 2)
                         if isnumeric(tb{:,i})
                             % Numeric vector
-                            tb{:,i} = (tb{:,i} - refEvent) * tScale;
+                            tb{:,i} = (tb{:,i} - refEvent) .* tScale;
                         elseif iscell(tb{:,i})
                             % Cell vector of numeric vectors
-                            tb{:,i} = cellfun(@(x,r) (x-r)*tScale, tb{:,i}, num2cell(refEvent), 'Uni', false);
+                            tb{:,i} = cellfun(@(x,r,s) (x-r)*s, ...
+                                tb{:,i}, num2cell(refEvent), num2cell(tScale), 'Uni', false);
                         else
                             warning(fprintf('Failed to align data in %s column of %s table\n', ...
                                 tb.Properties.VariableNames{i}, this.tableName{k}));
@@ -455,8 +465,8 @@ classdef MSessionExplorer < handle
                     
                 elseif this.isTimesSeriesTable(k)
                     % For timeSeries table
-                    this.tot.tableData{k}.time = ...
-                        cellfun(@(x,r) (x-r)*tScale, this.tot.tableData{k}.time, num2cell(refEvent), 'Uni', false);
+                    this.tot.tableData{k}.time = cellfun(@(x,r,s) (x-r)*s, ...
+                        this.tot.tableData{k}.time, num2cell(refEvent), num2cell(tScale), 'Uni', false);
                 end
                 
                 % Change referenceTime

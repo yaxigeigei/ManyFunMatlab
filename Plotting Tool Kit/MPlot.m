@@ -3,14 +3,6 @@ classdef MPlot
     %   
     
     methods(Static)
-        function h = BarSurf(v)
-            h = bar3(v, 1);
-            for k = 1 : length(h)
-                zdata = get(h(k), 'Zdata');
-                set(h(k), 'CData', zdata, 'FaceColor', 'interp');
-            end
-        end
-        
         function Blocks(xRange, yRange, color, varargin)
             % Plot rectangle blocks based on X anf Y ranges (based on third party function drawShadedRectangle)
             % 
@@ -300,10 +292,12 @@ classdef MPlot
             end
         end
         
-        function varargout = PlotTraceLadder(xx, yy, pos, varargin)
+        function varargout = PlotTraceLadder(varargin)
             % Plot traces as a ladder
             % 
-            %   MPlot.PlotTraceLadder(xx, yy, pos)
+            %   MPlot.PlotTraceLadder(yy)
+            %   MPlot.PlotTraceLadder(xx, yy)
+            %   MPlot.PlotTraceLadder(xx, yy, yPos)
             %   MPlot.PlotTraceLadder(..., 'ColorArray', [])
             %   MPlot.PlotTraceLadder(..., 'TraceFun', [])
             %   MPlot.PlotTraceLadder(..., 'LinePropertyName', value)
@@ -313,7 +307,7 @@ classdef MPlot
             %   xx                  1) A vector of x coordinates for all traces in yy. 
             %                       2) A matrix of x coordinates for every point in yy.
             %   yy                  Original y coordinates for each trace in column. 
-            %   pos                 Y position of each trace's zero after shifting them into a ladder. 
+            %   yPos                Y position of each trace's zero after shifting them into a ladder. 
             %   'ColorArray'        1) An n-by-3 array of RGB colors. n is the number of traces. 
             %                       2) An n-by-4 array of RGBA colors. 'A'(alpha) controls transparency. 
             %                       3) An n-element char vector of colors. (e.g. 'k', 'r', 'm')
@@ -330,34 +324,50 @@ classdef MPlot
             p.KeepUnmatched = true;
             p.PartialMatching = false;
             
+            p.addRequired('arg1');
+            p.addOptional('arg2', []);
+            p.addOptional('yPos', []);
             p.addParameter('ColorArray', [], @isnumeric);
             p.addParameter('TraceFunc', [], @(x) isa(x,'function_handle'));
             
             p.parse(varargin{:});
+            arg1 = p.Results.arg1;
+            arg2 = p.Results.arg2;
+            yPos = p.Results.yPos;
             colorArray = p.Results.ColorArray;
             traceFunc = p.Results.TraceFunc;
             
             varargin = p.Unmatched;
             
-            % Prepare data
+            if ~isempty(arg2)
+                xx = arg1;
+                yy = arg2;
+            else
+                yy = arg1;
+                xx = [];
+            end
+            
             if isvector(yy)
                 yy = yy(:);
             end
-            
+            if isempty(xx)
+                xx = 1 : size(yy,1);
+            end
             if isvector(xx)
                 xx = repmat(xx(:), 1, size(yy,2));
             end
-            
             if ~isempty(traceFunc)
                 for i = 1 : size(yy,2)
                     yy(:,i) = traceFunc(yy(:,i));
                 end
             end
-            
-            pos = pos(:)';
+            if isempty(yPos)
+                yPos = cumsum(-min(yy) + [0, max(yy(:,1:end-1))]);
+            end
+            yPos = yPos(:)';
             
             % Plot traces
-            hh = plot(xx, yy+pos, varargin);
+            hh = plot(xx, yy+yPos, varargin);
             
             if ~isempty(colorArray)
                 if isvector(colorArray)
@@ -455,6 +465,71 @@ classdef MPlot
             
             ax = axes;
             set(ax, 'Unit', 'pixel', 'Position', [panelPos, panelSize]);
+        end
+        
+        function Violin(nn, bb, hh, varargin)
+            % Plot histograms as violins
+            % 
+            %   MPlot.Violin(nn, bb, hh)
+            %   MPlot.Violin(nn, bb, hh, s)
+            %   MPlot.Violin(..., 'Color', 'k')
+            %   MPlot.Violin(..., 'Alpha', 0.3)
+            %   MPlot.Violin(..., 'Orientation', 'vertical')
+            %   MPlot.Violin(..., 'Alignment', 'center')
+            %
+            % Inputs:
+            %   nn              
+            %   bb              
+            %   hh              
+            %   s               
+            %   'Color'         Color of the shade. Default is black. 
+            %   'Alpha'         Transparancy of the shade. Default 0.3. 
+            %   'Orientation'   Orientation of violins. Default is 'vertical'.
+            %   'Alignment'     
+            %
+            
+            % Handles user inputs
+            p = inputParser();
+            p.addOptional('s', 1, @isscalar);
+            p.addParameter('Quantiles', [], @isnumeric);
+            p.addParameter('Color', 'k');
+            p.addParameter('Alpha', 1, @isnumeric);
+            p.addParameter('Orientation', 'vertical', @(x) any(strcmpi(x, {'vertical', 'horizontal'})));
+            p.addParameter('Alignment', 'center', @(x) any(strcmpi(x, {'low', 'high', 'center'})));
+            
+            p.parse(varargin{:});
+            s = p.Results.s;
+            color = p.Results.Color;
+            faceAlpha = p.Results.Alpha;
+            qt = p.Results.Quantiles;
+            ori = p.Results.Orientation;
+            alignType = p.Results.Alignment;
+            
+            % Ploting
+            hold on;
+            for k = 1 : size(hh,2)
+                b = [bb(:,k); flip(bb(:,k))];
+                h = hh(:,k)/s;
+                
+                switch alignType
+                    case 'center'
+                        h = nn(k) + [-h/2; flip(h/2)];
+                    case 'low'
+                        h = nn(k) + [zeros(size(h)); flip(h)] - nanmax(h)/2;
+                    case 'high'
+                        h = nn(k) + [-h; zeros(size(h))] + nanmax(h)/2;
+                end
+                
+                if strcmp(ori, 'vertical')
+                    patch(h, b, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                else
+                    patch(b, h, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                end
+            end
+            
+            function computeMarks(d, qtVect)
+                
+            end
         end
     end
     
