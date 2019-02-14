@@ -1,59 +1,47 @@
-function [ msArray ] = XMeanSquare2( fixed, moving, outputSize, focus )
+function ms = XMeanSquare2(a1, a2, varargin)
 %MEANSQUARE2 Summary of this function goes here
 %   Detailed explanation goes here
     
+    [ h1, w1 ] = size(a1);
+    [ h2, w2 ] = size(a2);
+    ms = zeros(h1+h2-1, w1+w2-1);
     
+    p = inputParser();
+    p.addParameter('Focus', [ ceil(h1/2), ceil(w1/2) ], @isnumeric);
+    p.addParameter('OutputSize', [], @isnumeric);
     
-    [ imHeight, imWidth ] = size(fixed);
+    p.parse(varargin{:});
+    focus = p.Results.Focus;
+    outputSize = p.Results.OutputSize;
     
-    if nargin < 3
-        outputSize = [ 2*imHeight-1, 2*imWidth-1 ];
+    if isempty(outputSize)
+        outputSize = size(ms);
+        rBeginInd = 1;
+        rEndInd = outputSize(1) - 1;
+        cBeginInd = 1;
+        cEndInd = outputSize(2) - 1;
+    else
+        rBeginInd = ceil((h2-1)/2) + focus(1) - ceil(outputSize(1)/2);
+        rEndInd = rBeginInd + outputSize(1) - 1;
+        cBeginInd = ceil((w2-1)/2) + focus(2) - ceil(outputSize(2)/2);
+        cEndInd = cBeginInd + outputSize(2) - 1;
     end
     
-    msArray = zeros(outputSize);
-    [ msHeight, msWidth ] = size(msArray);
+    [ rr1, rr2 ] = XIndexing(a1(:,1), a2(:,1));
+    [ cr1, cr2 ] = XIndexing(a1(1,:), a2(1,:));
     
+    a1 = double(a1);
+    a2 = double(a2);
     
-    if nargin < 4
-        focus = [ ceil(imHeight/2), ceil(imWidth/2) ];
-    end
-    
-    si = focus(1) - ceil(imHeight/2);
-    sj = focus(2) - ceil(imWidth/2);
-    
-    iCenter = ceil(msHeight/2) - si;
-    jCenter = ceil(msWidth/2) - sj;
-    
-    
-    
-    for j = 1 : msWidth
-        
-        dj = j - jCenter;
-        
-        jStartF = max(1, 1 + dj);
-        jEndF = min(imWidth, imWidth + dj);
-        
-        jStartM = max(1, 1 - dj);
-        jEndM = min(imWidth, imWidth - dj);
-        
-        for i = 1 : msHeight
-            
-            di = i - iCenter;
-            
-            iStartF = max(1, 1 + di);
-            iEndF = min(imHeight, imHeight + di);
-            
-            iStartM = max(1, 1 - di);
-            iEndM = min(imHeight, imHeight - di);
-            
-            fSub = fixed(iStartF : iEndF, jStartF : jEndF);
-            mSub = moving(iStartM : iEndM, jStartM : jEndM);
-            msArray(i,j) = MeanSquare2Norm(mSub, fSub);
-            
+    for i = rBeginInd : rEndInd
+        for j = cBeginInd : cEndInd
+            ms(i,j) = MeanSquare2Norm(a1(rr1(i,1):rr1(i,2), cr1(j,1):cr1(j,2)), ...
+                a2(rr2(i,1):rr2(i,2), cr2(j,1):cr2(j,2)));
         end
-        
     end
-
-
-
+    
+    ms = ms(rBeginInd : rEndInd, cBeginInd : cEndInd);
+    
+    
 end
+

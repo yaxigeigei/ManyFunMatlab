@@ -8,13 +8,13 @@ classdef MBrowse
     %
     
     methods(Static)
-        function [ filePath, folderPath, bareName, ext ] = File(defaultFolderPath, dialogTitle, filterSpec)
+        function [filePath, folderPath, bareName, ext] = File(defaultFolderPath, dialogTitle, filterSpec)
             % Browse to select a file and get path parts
             %
-            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File()
-            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File(defaultFolderPath)
-            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File(defaultFolderPath, dialogTitle)
-            %   [ filePath, folderPath, bareName, ext ] = MBrowse.File(defaultFolderPath, dialogTitle, filterSpec)
+            %   [filePath, folderPath, bareName, ext] = MBrowse.File()
+            %   [filePath, folderPath, bareName, ext] = MBrowse.File(defaultFolderPath)
+            %   [filePath, folderPath, bareName, ext] = MBrowse.File(defaultFolderPath, dialogTitle)
+            %   [filePath, folderPath, bareName, ext] = MBrowse.File(defaultFolderPath, dialogTitle, filterSpec)
             %
             
             % Handle user inputs
@@ -43,13 +43,13 @@ classdef MBrowse
             end
             
             % Get file path info
-            [ fileName, folderPath ] = uigetfile(filterSpec, dialogTitle, defaultFolderPath);
+            [fileName, folderPath] = uigetfile(filterSpec, dialogTitle, defaultFolderPath);
             
             % Check selection
             if folderPath
                 % Decompose paths
                 filePath = fullfile(folderPath, fileName);
-                [ ~, bareName, ext ] = fileparts(fileName);
+                [~, bareName, ext] = fileparts(fileName);
                 
                 % Remember new folder path
                 defaultFolderPath = folderPath;
@@ -61,13 +61,13 @@ classdef MBrowse
             end
         end
         
-        function [ filePath, folderPath, bareNames, exts ] = Files(defaultFolderPath, dialogTitle, filterSpec)
+        function [filePath, folderPath, bareNames, exts] = Files(defaultFolderPath, dialogTitle, filterSpec)
             % Browse to select multiple files and get path parts
             %
-            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files()
-            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files(defaultFolderPath)
-            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files(defaultFolderPath, dialogTitle)
-            %   [ filePath, folderPath, bareNames, exts ] = MBrowse.Files(defaultFolderPath, dialogTitle, filterSpec)
+            %   [filePath, folderPath, bareNames, exts] = MBrowse.Files()
+            %   [filePath, folderPath, bareNames, exts] = MBrowse.Files(defaultFolderPath)
+            %   [filePath, folderPath, bareNames, exts] = MBrowse.Files(defaultFolderPath, dialogTitle)
+            %   [filePath, folderPath, bareNames, exts] = MBrowse.Files(defaultFolderPath, dialogTitle, filterSpec)
             %
             
             % Handle user inputs
@@ -96,13 +96,13 @@ classdef MBrowse
             end
             
             % Get file path info
-            [ fileName, folderPath ] = uigetfile(filterSpec, dialogTitle, defaultFolderPath, 'MultiSelect', 'on');
+            [fileName, folderPath] = uigetfile(filterSpec, dialogTitle, defaultFolderPath, 'MultiSelect', 'on');
             
             if folderPath
                 % Decompose paths
                 fileName = cellstr(fileName)';
                 filePath = cellfun(@(x) fullfile(folderPath, x), fileName, 'UniformOutput', false);
-                [ ~, bareNames, exts ] = cellfun(@fileparts, fileName, 'UniformOutput', false);
+                [~, bareNames, exts] = cellfun(@fileparts, fileName, 'UniformOutput', false);
                 
                 % Remember new folder path
                 defaultFolderPath = folderPath;
