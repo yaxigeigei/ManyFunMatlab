@@ -86,6 +86,51 @@ classdef MMath
             condDist(isnan(condDist)) = 0;
         end
         
+        function [x, D] = Decimate(x, r, n, D)
+            %Similar to the MATLAB decimate function but with the following modifications
+            % 1) Accepts data types other than double
+            % 2) If x is an matrix, treats each column as a time series
+            % 3) To be consistent with MATLAB downsample function, it uses the (n+1)-th 
+            % 	 value in each bin of r samples
+            % 4) By default, it uses 10th-order elliptic (IIR) lowpass filter rather than 
+            %    cheby1 or FIRs. 
+            %    - fpass is fs/r/2 (i.e. Nyquist freq. of the output), fstop is ~1.2*fpass
+            %    - passband has ~1/1000th distorsion (ripple) aross different amplitudes
+            %    - stopband is attenuated >10000 times in amplitude
+            % 5) User can provide custom digitalFilter object
+            %   
+            %   [x, D] = MMath.Decimate(x, r)
+            %   [x, D] = MMath.Decimate(x, r, n)
+            %   [x, D] = MMath.Decimate(x, r, n, D)
+            
+            if nargin < 4
+                D = designfilt('lowpassiir', ...
+                    'FilterOrder', 10, ...
+                    'PassbandFrequency', 1/r, ...
+                    'PassbandRipple', .01, ...
+                    'StopbandAttenuation', 80);
+            end
+            if nargin < 3
+                n = 0;
+            end
+            
+            isRow = isrow(x);
+            if isRow
+                x = x';
+            end
+            
+            % Filter one column at a time to save memory and conserve data type
+            for i = 1 : size(x,2)
+                x(:,i) = filtfilt(D, double(x(:,i)));
+            end
+            
+            x = downsample(x, r, n);
+            
+            if isRow
+                x = x';
+            end
+        end
+        
         function H = Entropy(probDist)
             %Calculates the Shannon's entropy of a given probability distribution
             %
@@ -400,10 +445,7 @@ classdef MMath
                 return;
             end
             
-            if isvector(vect)
-                vect = vect(:);
-            end
-            
+            vect = logical(vect(:));
             vect = [ zeros(1,size(vect,2)); vect; zeros(1,size(vect,2)) ];
             dVect = diff(vect);
             boundariesInd = [ find(dVect == 1), find(dVect == -1) - 1 ];

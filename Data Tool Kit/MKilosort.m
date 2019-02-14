@@ -29,51 +29,76 @@ classdef MKilosort
             02, 04, 05, 07, 09, 11, 10, 13, 08, 17, 06, 16, 03, 14, 01, 12, ... % Shank C
             27, 25, 23, 20, 22, 31, 21, 29, 19, 18, 24, 30, 26, 32, 28, 15];    % Shank D
         
-        chanMapTetrode32 = [ 9:24, 8:-1:1, 32:-1:25 ];
+        chanMapTetrode32 = [ 25:32, 1:8, 24:-1:9 ];
     end
     
     methods(Static)
-        function Sort(datFilePath, chanMapName)
-            % Run spike sorting on a binary file
+        function Sort(datFilePath, fChanMap, fConfig)
+            % Run spike sorting on a binary file. Results will be saved in the folder of .dat file.
+            % Auto merge is disabled and no imtermediate data is saved. 
+            % 
+            %   MKilosort.Sort()
+            %   MKilosort.Sort(datFilePath)
+            %   MKilosort.Sort(datFilePath, fChanMap, fConfig)
+            % 
+            % Inputs
+            %   datFilePath         A binary file of extracellular recording data. If not specified, a file
+            %                       selection window will be prompted. 
+            %   
+            %   If either one of fChanMap or fConfig is not provided, a dialog box will allow you to choose a 
+            %   probe type for the preset configuration and channel map. 
+            %   
+            %   fChanMap            A handle of a function that takes the folder path of the .dat file as input 
+            %                       and saves a chanMap.mat file to that folder. Examples can be found in the 
+            %                       methods of this class (e.g. @MKilosort.SaveChanMapH3, modified from 
+            %                       createChannelMapFile.m in the configFiles folder of Kilosort repository). 
+            %   fConfig             A handle of a function that takes the path of the .dat file as input and 
+            %                       returns a structure of options. Examples can be found in the methods of this 
+            %                       class (e.g. @MKilosort.Config64, modified from StandardConfig_MOVEME.m in 
+            %                       the configFiles folder of Kilosort repository). 
+            % 
             
             % Find .dat file
             if nargin < 1
-                datFilePath = MBrowse.File([], 'Select a Kilosort .dat file');
+                datFilePath = MBrowse.File([], 'Select a Kilosort .dat file', '*.dat');
             end
             if isempty(datFilePath)
                 return;
             end
             ksDir = fileparts(datFilePath);
             
-            % Choose channel map if not provided
-            if nargin < 2
-                chanMapList = properties(MKilosort);
-                selected = listdlg('PromptString', 'Select a channel map', ...
+            % Choose a preset configuration and channel map functions
+            if nargin < 3
+                chanMapNames = properties(MKilosort);
+                probeNames = cellfun(@(x) x(8:end), chanMapNames, 'Uni', false);
+                selected = listdlg('PromptString', 'Select a preset configuration', ...
                     'SelectionMode', 'single', ...
-                    'ListString', chanMapList);
+                    'ListString', probeNames);
                 if isempty(selected)
                     return;
                 end
-                chanMapName = chanMapList{selected};
+                
+                switch probeNames{selected}
+                    case 'H3'
+                        fChanMap = @MKilosort.SaveChanMapH3;
+                        fConfig = @MKilosort.Config64;
+                    case 'H2'
+                        fChanMap = @MKilosort.SaveChanMapH2;
+                        fConfig = @MKilosort.Config64;
+                    case 'P64'
+                        fChanMap = @MKilosort.SaveChanMapP64;
+                        fConfig = @MKilosort.Config64;
+                    case 'Tetrode32'
+                        fChanMap = @MKilosort.SaveChanMapTetrode32;
+                        fConfig = @MKilosort.Config32;
+                end
             end
             
-            % Load correct option structure and save the channel map
-            switch chanMapName
-                case 'chanMapH3'
-                    ops = MKilosort.Config64(datFilePath);
-                    MKilosort.SaveChanMapH3(ksDir);
-                case 'chanMapH2'
-                    ops = MKilosort.Config64(datFilePath);
-                    MKilosort.SaveChanMapH2(ksDir);
-                case 'chanMapP64'
-                    ops = MKilosort.Config64(datFilePath);
-                    MKilosort.SaveChanMapP64(ksDir);
-                case 'chanMapTetrode32'
-                    ops = MKilosort.Config32(datFilePath);
-                    MKilosort.SaveChanMapTetrode32(ksDir);
-                otherwise
-                    error('%s is not a valid name of channel map.', chanMapName);
-            end
+            % Generate chanMap.mat file
+            fChanMap(ksDir);
+            
+            % Get configuration structure
+            ops = fConfig(datFilePath);
             
             % Initialize GPU (will erase any existing GPU arrays)
             if ops.GPU
@@ -108,11 +133,37 @@ classdef MKilosort
         end
         
         function result = Output(ksDir)
-            % Import results after reviewing in TemplateGUI
+            % Import and process outputs after sorting and reviewing in TemplateGUI. 
+            % (~4300 spikes/second if running on SSD and >10 times slower if on HDD)
+            % 
+            %   result = MKilosort.Output()
+            %   result = MKilosort.Output(ksDir)
+            % 
+            % Input
+            %   ksDir                         The folder which saves Kilosort and Phy outputs. If not provided, 
+            %                                 a folder selection window will be prompted. 
+            % Outputs
+            %   result                        A structure with the following fields.
+            %     spike_times                   A [1,nUnit] cell array of [nSpk,1] spike times.
+            %     spike_template_ids            A [1,nUnit] cell array of [nSpk,1] spike template IDs.
+            %     spike_template_amplitudes     A [1,nUnit] cell array of [nSpk,1] spike template amplitudes.
+            %     spike_waveforms               A [1,nUnit] cell array of [nSpk,time] spike waveform extracted from
+            %                                   the primary channel of each unit. Scaled by 0.195 microvolt. 
+            %     info                          Metadata with the following fields. 
+            %       recording_time                The duration of recording in second. 
+            %       sample_rate                   Recording sampling rate. 
+            %       templates                     A [nTemp,time,nChan] array of all templates used in spike sorting. 
+            %       unit_mean_template            A [time,nChan,nUnit] array of mean templates. 
+            %       unit_mean_waveform            A [time,nUnit] array of mean waveform. 
+            %       unit_channel_ind              Indices of primary channel (after mapping) for each unit. 
+            %       channel_map                   Indices that reorders recording channels. 
+            % 
             
             if nargin < 1
                 ksDir = MBrowse.Folder([], 'Select the Kilosort folder');
             end
+            
+            disp('Import and process outputs from Kilosort and TemplateGUI');
             
             % Get parameters from params.py by running lines in MATLAB
             %   these include dat_path, dtype, n_channels_dat, sample_rate ...
@@ -133,7 +184,7 @@ classdef MKilosort
             nSample = numel(mdat.Data) / n_channels_dat;
             mdat = memmapfile(datPath, 'Format', {dtype, [n_channels_dat nSample], 'v'});
             
-            % Load sorting outputs
+            % Load Kilosort and TemplateGUI outputs
             chanMap = readNPY(fullfile(ksDir, 'channel_map.npy')) + 1;          % channel map
             spkTimeInd = readNPY(fullfile(ksDir, 'spike_times.npy'));           % sample indices of all spikes
             spkClusterIDs = readNPY(fullfile(ksDir, 'spike_clusters.npy'));     % cluster ID of all spikes
@@ -164,6 +215,8 @@ classdef MKilosort
             
             % Loop through good clusters
             for k = numel(goodClusterIDs) : -1 : 1
+                fprintf('Process unit #%i\n', numel(goodClusterIDs)-k+1);
+                
                 % Get sample indices and template IDs of the current cluster
                 isUnit = spkClusterIDs == goodClusterIDs(k);
                 stInd = spkTimeInd(isUnit);
@@ -180,10 +233,26 @@ classdef MKilosort
                 [~, chanIdx] = max(tpPower);
                 
                 % Collect raw spike waveforms
+                %   when a waveform is at the edge of recording, we pad the waveform to the required length 
+                %   by replicating the last value
                 rawChanIdx = chanMap(chanIdx);
                 W = zeros(nSide*2, numel(stInd));
                 for i = 1 : numel(stInd)
-                    W(:,i) = mdat.Data.v(rawChanIdx, stInd(i)-nSide+1 : stInd(i)+nSide);
+                    idxStart = stInd(i) - nSide + 1;
+                    idxEnd = stInd(i) + nSide;
+                    if idxStart < 1
+                        idxStart = 1;
+                        w = mdat.Data.v(rawChanIdx, idxStart : idxEnd);
+                        wPad = repmat(w(1), 1, nSide*2-numel(w));
+                        W(:,i) = [wPad w];
+                    elseif idxEnd > nSample
+                        idxEnd = nSample;
+                        w = mdat.Data.v(rawChanIdx, idxStart : idxEnd);
+                        wPad = repmat(w(end), 1, nSide*2-numel(w));
+                        W(:,i) = [w wPad];
+                    else
+                        W(:,i) = mdat.Data.v(rawChanIdx, idxStart : idxEnd);
+                    end
                 end
                 
                 % Highpass-filter waveforms
@@ -214,7 +283,8 @@ classdef MKilosort
             result.info.templates = templates;
             result.info.unit_mean_template = uMeanTemplates(:,:,sortInd);
             result.info.unit_mean_waveform = uMeanWaveform(:,sortInd);
-            result.info.unit_channel_ind = uChanInd;
+            result.info.unit_channel_ind = uChanInd; 
+            result.info.channel_map = chanMap;
         end
         
         function ops = Config64(datFilePath)
@@ -293,7 +363,7 @@ classdef MKilosort
         end
         
         function ops = Config32(datFilePath)
-            % This configuration works with H3, H2, and P-64chan when running on GPU with 3GB+ memory
+            % This configuration works with 32-channel probes or tetrodes
             
             ksDir = fileparts(datFilePath);
             
