@@ -993,7 +993,7 @@ classdef MSessionExplorer < handle
         function winOut = IValidateTimeWindows(~, winIn, tbHeight, rowInd)
             % Validate and convert time windows to a cell array of window matrices
             
-            if isnumeic(winIn)
+            if isnumeric(winIn)
                 winIn = num2cell(winIn, 2);
             end
             winIn = winIn(:);
@@ -1001,7 +1001,7 @@ classdef MSessionExplorer < handle
             winOut = num2cell(NaN(tbHeight,2), 2);
             if numel(winIn) == 1
                 % Propagate value to all epochs
-                winOut(rowInd) = repmat(winIn, [rowInd 1]);
+                winOut(rowInd) = repmat(winIn, [numel(rowInd) 1]);
             elseif numel(winIn) == numel(rowInd)
                 % Add windows to selected rows
                 winOut(rowInd) = winIn;
