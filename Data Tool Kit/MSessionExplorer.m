@@ -22,14 +22,14 @@ classdef MSessionExplorer < handle
         epochInd;               % Indices of epoch
         isVerbose = true;       % Whether or not to display progress and some warnings
     end
-    properties(Hidden)
+    properties(Access = private)
         originalTrialInd;       % for backward compatibility
     end
     properties(Dependent, Hidden)
         numTrials;              % for backward compatibility
     end
     
-    % These methods operate on data in this object
+    % These methods are exposed to users
     methods
         % Constructor
         function this = MSessionExplorer()
@@ -69,7 +69,9 @@ classdef MSessionExplorer < handle
             this.epochInd = val(:);
         end
         function val = get.epochInd(this)
-            if isempty(this.epochInd) && this.numEpochs > 0
+            if isempty(this.epochInd) && this.numEpochs > 0 && ~isempty(this.originalTrialInd)
+                warning(['originalTrialInd property will be removed in a future version. ' ...
+                    'Use epochInd instead and consider saving an updated object.']);
                 this.epochInd = this.originalTrialInd;
             end
             val = this.epochInd;
@@ -77,10 +79,6 @@ classdef MSessionExplorer < handle
         function set.isVerbose(this, val)
             assert(islogical(val) && isscalar(val), 'isVerbose must be a logical scalar');
             this.isVerbose = val;
-        end
-        function val = get.originalTrialInd(this)
-            warning('originalTrialInd property will be removed in a future version. Use epochInd instead.');
-            val = this.originalTrialInd;
         end
         function val = get.numTrials(this)
             warning('numTrials property will be removed in a future version. Use numEpochs instead.');
@@ -95,7 +93,7 @@ classdef MSessionExplorer < handle
             %   Preview(tbName1, tbName2, tbName3, ...)
             % 
             % Inputs
-            %   tbNameX         Name of a data table to display. 
+            %   tbNameN         Name of a data table to display. 
             %                   If not specified, this method will display tot and userData. 
             
             if nargin < 2
@@ -256,34 +254,35 @@ classdef MSessionExplorer < handle
                     this.tot{tbName, 'tableType'}{1} = tbType;
                 end
             else
+                isFirst = isempty(this.tot);
+                
                 % Add a new table
                 assert(~isempty(tbType), 'Table type is required for adding a new table');
                 totHeaders = this.tot.Properties.VariableNames;
                 totRow = cell2table({tbType, tb, []}, 'VariableNames', totHeaders, 'RowNames', {tbName});
                 this.tot = [this.tot; totRow];
+                
+                % Initialize epoch indices
+                if isFirst
+                    this.epochInd = (1 : height(tb))';
+                end
             end
             
             % Set reference time
             if ~isempty(refTimes)
                 this.SetReferenceTime(refTimes, tbName);
             end
-            
-            % Initialize epoch indices
-            if isempty(this.epochInd)
-                this.epochInd = (1 : this.numEpochs)';
-            end
         end
         
         function varargout = GetTable(this, varargin)
             % Return specific data table(s)
             % 
-            %   tb = GetTable(tbName)
             %   [tb1, tb2, tb3, ...] = GetTable(tbName1, tbName2, tbName3, ...)
             %
             % Input
-            %   tbName          The name of table to return. 
+            %   tbNameN         The name of table to return. 
             % Output
-            %   tb              The table data. 
+            %   tbN             The table data. 
             
             this.IValidateTableNames(varargin, true);
             for i = numel(varargin) : -1 : 1
@@ -291,16 +290,19 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function RemoveTable(this, tbNames)
-            % Remove specific data table(s)
+        function RemoveTable(this, varargin)
+            % Remove specific data tables
             % 
-            %   RemoveTable(tbNames)
+            %   RemoveTable(tbName1, tbName2, tbName3, ...)
             %
             % Input
-            %   tbNames         A string or cell array of strings indicating the name of table(s) to remove.
+            %   tbNameN         A string or cell array of strings indicating the name of table(s) to remove.
             
-            this.IValidateTableNames(tbNames);
-            this.tot(tbNames,:) = [];
+            this.IValidateTableNames(varargin, true);
+            this.tot(varargin,:) = [];
+            if isempty(this.tot)
+                this.epochInd = [];
+            end
         end
         
         function SetReferenceTime(this, rt, tbNames)
@@ -343,14 +345,13 @@ classdef MSessionExplorer < handle
             % Return reference times
             % 
             %   rt = GetReferenceTime()
-            %   rt = GetReferenceTime(tbName)
             %   [rt1, rt2, rt3, ...] = GetReferenceTime(tbName1, tbName2, tbName3, ...)
             %
             % Input
-            %   tbName          The name of a table which the reference time is associated with. If not 
+            %   tbNameN         The name of a table which the reference time is associated with. If not 
             %                   specified, the first availble reference time will be returned. 
             % Output
-            %   rt              A vector of reference times. 
+            %   rtN             A vector of reference times. 
             
             if nargin > 1
                 this.IValidateTableNames(varargin, true);
@@ -622,8 +623,8 @@ classdef MSessionExplorer < handle
             %                       of the table or the number of selected rows, each window is applied to respective 
             %                       row. Inf values will be substuted by min or max time available, respectively. 
             %                       2) An n-element cell array where each element is a m-by-2 matrix of time windows. 
-            %                       n must equal to the height of the table or the number of selected rows. All m 
-            %                       windows in a m-by-2 matrix are applied to a corresponding row. 
+            %                       All m windows will be applied to a single corresponding row, resulting in m rows 
+            %                       in tbOut. Options for cell array length, n, are the same as described above. 
             %   rowInd              Integer or logical indices of rows to operate on and return. The default value is 
             %                       empty indicating all rows. 
             %   colInd              Integer or logical indices of columns to operate on and return. It can also be 
@@ -919,8 +920,8 @@ classdef MSessionExplorer < handle
         end
     end
     
+    % These methods are for backward compatibility
     methods(Hidden)
-        % For backward compatibility
         function SortTrials(this, ind)
             warning('SortTrials method will be removed in a future version. Use SortEpochs instead.');
             this.SortEpochs(ind);

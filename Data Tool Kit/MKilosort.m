@@ -132,12 +132,12 @@ classdef MKilosort
             
         end
         
-        function result = Output(ksDir)
-            % Import and process outputs after sorting and reviewing in TemplateGUI. 
+        function result = ImportResults(ksDir)
+            % Import and process results after sorting and reviewing in TemplateGUI. 
             % (~4300 spikes/second if running on SSD and >10 times slower if on HDD)
             % 
-            %   result = MKilosort.Output()
-            %   result = MKilosort.Output(ksDir)
+            %   result = MKilosort.ImportResults()
+            %   result = MKilosort.ImportResults(ksDir)
             % 
             % Input
             %   ksDir                         The folder which saves Kilosort and Phy outputs. If not provided, 
@@ -161,6 +161,10 @@ classdef MKilosort
             
             if nargin < 1
                 ksDir = MBrowse.Folder([], 'Select the Kilosort folder');
+                if ~ksDir
+                    result = [];
+                    return;
+                end
             end
             
             disp('Import and process outputs from Kilosort and TemplateGUI');

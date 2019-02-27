@@ -124,7 +124,7 @@ classdef MIntan
                     sigTime = eval([sigName '_time;']);
                     
                     if isempty(sigData)
-                        warning('%s data is not available\n', sigName);
+                        warning('%s data is not available', sigName);
                         continue;
                     else
                         fprintf('Processing %s data\n', sigName);
