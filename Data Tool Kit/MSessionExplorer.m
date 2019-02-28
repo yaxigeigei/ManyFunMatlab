@@ -71,7 +71,7 @@ classdef MSessionExplorer < handle
         function val = get.epochInd(this)
             if isempty(this.epochInd) && this.numEpochs > 0 && ~isempty(this.originalTrialInd)
                 warning(['originalTrialInd property will be removed in a future version. ' ...
-                    'Use epochInd instead and consider saving an updated object.']);
+                    'Use epochInd instead and consider saving the updated object.']);
                 this.epochInd = this.originalTrialInd;
             end
             val = this.epochInd;
@@ -531,8 +531,9 @@ classdef MSessionExplorer < handle
             %                   If refType is 'absolute', tSlice can be a vector of arbitrary length. 
             %   refType         'absolute' or 'relative', indicating whether tSlice represents absolute times in 
             %                   the session or is relative to epoch reference times. If using 'absolute', existing 
-            %                   epoch sorting and time alignment will be lost due to a potential change in epoch 
-            %                   number. New data will sort epochs in temporal order and align epoch time to tSlice. 
+            %                   epoch sorting, time alignment and all eventValues table will be lost due to an 
+            %                   unknown relationship between current and new epochs. New data will sort epochs in 
+            %                   temporal order and align epoch time to respective tSlice. 
             
             warning('This method is in beta version and should not be used for formal analysis');
             
@@ -577,11 +578,10 @@ classdef MSessionExplorer < handle
                     for i = 1 : width(tb)
                         vect{i} = this.ICatColumn(tb.(i), tRef);
                     end
-                    s = MSessionExplorer.MakeEventTimesTable(vect, ...
+                    this.tot.tableData{k} = MSessionExplorer.MakeEventTimesTable(vect, ...
                         'DelimiterTimes', tDelim, ...
-                        'FillEmpty', NaN, ...
-                        'VariableNames', tb.Properties.VariableNames);
-                    this.tot.tableData{k} = s.etTable;
+                        'VariableNames', tb.Properties.VariableNames, ...
+                        'Verbose', this.isVerbose);
                     
                 elseif this.isTimesSeriesTable(k)
                     % For timeSeries table
@@ -589,15 +589,20 @@ classdef MSessionExplorer < handle
                     for i = 2 : width(tb)
                         vect{i} = cat(1, tb.(i){:});
                     end
-                    s = MSessionExplorer.MakeTimeSeriesTable(vect(1), vect(2:end), ...
+                    this.tot.tableData{k} = MSessionExplorer.MakeTimeSeriesTable(vect(1), vect(2:end), ...
                         'DelimiterTimes', tDelim, ...
-                        'VariableNames', tb.Properties.VariableNames);
-                    this.tot.tableData{k} = s.tsTable;
+                        'VariableNames', tb.Properties.VariableNames, ...
+                        'Verbose', this.isVerbose);
                 end
                 this.tot.referenceTime{k} = tDelim;
             end
             
             if strcmp(refType, 'absolute')
+                % Remove any eventValues table
+                if any(this.isEventValuesTable)
+                    warning('All eventValues table will be removed when using ''%s'' times', refType);
+                    this.tot(this.isEventValuesTable,:) = [];
+                end
                 % Reset epochInd
                 this.epochInd = (1 : this.numEpochs)';
             else
@@ -920,20 +925,8 @@ classdef MSessionExplorer < handle
         end
     end
     
-    % These methods are for backward compatibility
-    methods(Hidden)
-        function SortTrials(this, ind)
-            warning('SortTrials method will be removed in a future version. Use SortEpochs instead.');
-            this.SortEpochs(ind);
-        end
-        function RemoveTrials(this, ind2rm)
-            warning('RemoveTrials method will be removed in a future version. Use RemoveEpochs instead.');
-            this.RemoveEpochs(ind2rm);
-        end
-    end
-    
-    % These methods are only used internally
-    methods(Access = private)
+    % These methods are used internally
+    methods(Access = protected)
         function val = IValidateTableName(this, tbName, isAssert)
             % The table name must be a string
             val = ischar(tbName);
@@ -1231,8 +1224,18 @@ classdef MSessionExplorer < handle
         end
     end
     
-    % Hide methods from handle superclass
     methods(Hidden)
+        % These methods are for backward compatibility
+        function SortTrials(this, ind)
+            warning('SortTrials method will be removed in a future version. Use SortEpochs instead.');
+            this.SortEpochs(ind);
+        end
+        function RemoveTrials(this, ind2rm)
+            warning('RemoveTrials method will be removed in a future version. Use RemoveEpochs instead.');
+            this.RemoveEpochs(ind2rm);
+        end
+        
+        % Hide methods from handle superclass
         function listener(~)
         end
         function addlistener(~)

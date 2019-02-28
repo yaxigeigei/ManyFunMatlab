@@ -5,14 +5,13 @@ classdef Event
     properties(Dependent)
         t;
         T;
-        V;
-        isValid;
     end
-    
-    properties(Hidden)
-        i_t = NaN;
-        i_T = struct();
-        i_V;
+    properties
+        V;
+    end
+    properties(Access = private)
+        t_ = NaN;
+        T_ = struct();
     end
     
     methods
@@ -38,63 +37,69 @@ classdef Event
         % Setters and Getters
         function this = set.t(this, val)
             assert(isscalar(val) && isnumeric(val), 't must be a numeric scalar');
-            this.i_t = val;
+            this.t_ = val;
         end
         function val = get.t(this)
-            val = this.i_t;
+            val = this.t_;
         end
         function this = set.T(this, val)
             if isempty(val)
                 val = struct();
             end
-            assert(isstruct(val), 'eventTimes must be a struct or empty but instead was %s', class(val));
-            structfun(@(x) assert(isnumeric(x), 'Fields in eventTimes must be of numeric types'), val);
-            this.i_T = val;
+            assert(isstruct(val), 'T must be a struct or empty array but instead was %s', class(val));
+            isNum = structfun(@isnumeric, val);
+            assert(all(isNum), 'Fields of T must be numeric array');
+            this.T_ = val;
         end
         function val = get.T(this)
-            val = this.i_T;
+            val = this.T_;
         end
-        function this = set.V(this, val)
-            this.i_V = val;
+        function val = Tfield(this, fieldName, varargin)
+            val = arrayfun(@(x) x.T_.(fieldName), this, varargin{:});
         end
-        function val = get.V(this)
-            val = this.i_V;
-        end
-        function val = get.isValid(this)
-            val = ~isnan(this.i_t);
+        function val = Vfield(this, fieldName, varargin)
+            val = arrayfun(@(x) x.V.(fieldName), this, varargin{:});
         end
         
         % Function Overloading
         function val = double(this)
-            val = arrayfun(@(x) x.t, this);
+            val = double(this.IGet_t());
         end
-        function [this, ind] = sort(this)
-            [~, ind] = sort(double(this));
+        function val = single(this)
+            val = single(this.IGet_t());
+        end
+        function val = isnan(this)
+            val = isnan(this.IGet_t());
+        end
+        function [this, ind] = sort(this, varargin)
+            [~, ind] = sort(this.IGet_t(), varargin{:});
             this = this(ind);
         end
-        function val = plus(obj1, obj2)
+        
+        % Operator Overloading
+        function obj = plus(obj1, obj2)
             if isa(obj2, 'double')
-                val = obj1.IOffsetTime(obj2);
+                obj = IOffsetTime(obj1, obj2);
             else
-                val = obj2.IOffsetTime(obj1);
+                obj = IOffsetTime(obj2, obj1);
             end
         end
-        function val = minus(obj1, obj2)
+        function obj = minus(obj1, obj2)
             if isa(obj2, 'double')
-                val = obj1.IOffsetTime(-obj2);
+                obj = IOffsetTime(obj1, -obj2);
             else
-                val = obj2.IOffsetTime(-obj1);
+                obj = IOffsetTime(obj2, -obj1);
             end
         end
-        function val = times(obj1, obj2)
+        function obj = times(obj1, obj2)
             if isa(obj2, 'double')
-                val = obj1.IScaleTime(obj2);
+                obj = IScaleTime(obj1, obj2);
             else
-                val = obj2.IScaleTime(obj1);
+                obj = IScaleTime(obj2, obj1);
             end
         end
-        function val = mtimes(obj1, obj2)
-            val = times(obj1, obj2);
+        function obj = mtimes(obj1, obj2)
+            obj = times(obj1, obj2);
         end
         function val = lt(obj1, obj2)
             val = double(obj1) < double(obj2);
@@ -117,16 +122,23 @@ classdef Event
     end
     
     methods(Access = private)
+        % Utilities
+        function val = IGet_t(this)
+            val = zeros(size(this));
+            for i = 1 : numel(this)
+                val(i) = this(i).t_;
+            end
+        end
         function this = IOffsetTime(this, val)
             for i = 1 : numel(this)
-                this(i).t = this(i).t + val;
-                this(i).i_T = structfun(@(x) x+val, this(i).i_T);
+                this(i).t_ = this(i).t_ + val;
+                this(i).T_ = structfun(@(x) x + val, this(i).T_, 'Uni', false);
             end
         end
         function this = IScaleTime(this, val)
             for i = 1 : numel(this)
-                this(i).t = this(i).t * val;
-                this(i).i_T = structfun(@(x) x*val, this(i).i_T);
+                this(i).t_ = this(i).t * val;
+                this(i).T_ = structfun(@(x) x * val, this(i).T_, 'Uni', false);
             end
         end
     end

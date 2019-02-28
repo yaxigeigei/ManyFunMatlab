@@ -172,10 +172,10 @@ classdef MPlotter < handle
             noteStr = [ ...
                 "Modifiers"; ...
                 "*  None: 5 ms or 1 trial"; ...
-                "*  Alt: 1ms";
-                "*  Ctrl: 10 ms or 2 trial"; ...
-                "*  Shift: 20 ms or 10 trial"; ...
-                "*  Ctrl + Shift: 400 ms or 20 trial"; ...
+                "*  Alt: 1 ms";
+                "*  Ctrl: 25 ms or 2 trial"; ...
+                "*  Shift: 100 ms or 10 trial"; ...
+                "*  Ctrl + Shift: 500 ms or 20 trial"; ...
                 ];
             
             x = ww/2;
@@ -285,16 +285,16 @@ classdef MPlotter < handle
             
             dTrial = 1;
             dTime = 0.005;
+            if any(strcmp(eventdata.Modifier, 'alt'))
+                dTime = dTime / 5;
+            end
             if any(strcmp(eventdata.Modifier, 'control'))
                 dTrial = dTrial * 2;
-                dTime = dTime * 2;
+                dTime = dTime * 5;
             end
             if any(strcmp(eventdata.Modifier, 'shift'))
                 dTrial = dTrial * 10;
-                dTime = dTime * 4;
-            end
-            if any(strcmp(eventdata.Modifier, 'alt'))
-                dTime = dTime / 5;
+                dTime = dTime * 20;
             end
             
             switch eventdata.Key

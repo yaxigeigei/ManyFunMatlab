@@ -8,8 +8,10 @@ end
 for i = 1 : numel(se)
     if iscellstr(se)
         % Load, update and save object
+        fprintf('Load file\n  %s', se{i});
         s = load(se{i});
         structfun(@Update, s);
+        fprintf('Save file\n');
         save(se{i}, '-struct', 's');
     else
         % Update objet
@@ -26,12 +28,14 @@ if ~isa(se, 'MSessionExplorer')
     return;
 end
 
-if isempty(se.epochInd) && se.numEpochs > 0
-    disp('This object was generated before 2/26/2019');
-    disp('Please refactor originalTrialInd to epochInd and numTrials to numEpochs in your code');
-    se.epochInd = se.originalTrialInd;
-else
-    disp('This object is of the latest version');
+for i = 1 : numel(se)
+    if isempty(se(i).epochInd) && se(i).numEpochs > 0
+        disp('This object was generated before 2/26/2019');
+        disp('Please refactor originalTrialInd to epochInd and numTrials to numEpochs in your code');
+        se(i).epochInd = se(i).originalTrialInd;
+    else
+        disp('This object is of the latest version');
+    end
 end
 
 end
