@@ -1,5 +1,12 @@
 function se = UpdateOldObject(se)
-% 
+% Update objects generated and/or saved before Feb, 2019
+%
+%   se = UpdateOldObject(se)
+%
+% Input
+%   se      An array of MSessionExplorer objects or file paths
+% Output
+%   se      An array of updated MSessionExplorer objects or file paths saved to
 
 if ischar(se) || iscellstr(se) || isstring(se)
     se = cellstr(se);

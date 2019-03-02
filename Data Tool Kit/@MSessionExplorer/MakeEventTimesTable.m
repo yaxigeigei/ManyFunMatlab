@@ -1,8 +1,8 @@
 function [tb, preTb] = MakeEventTimesTable(et, varargin)
-% Organize event times data into a table that works in MSessionExplorer objects. 
+% Organize event times data into an 'eventTimes' table. 
 % Specifically, each row of this table contains data from a unique period of time, or 
-% an epoch (e.g. a trial). Each columns contains timestamps of a given event. Epochs 
-% that do not have any data are filled with NaN (or a empty object). 
+% an epoch (e.g. a trial). Each column contains timestamps of a given event. Epochs 
+% that do not have any data are filled with NaN (or an empty object). 
 % 
 %   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(et)
 %   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(..., 'DelimiterTimes', [])

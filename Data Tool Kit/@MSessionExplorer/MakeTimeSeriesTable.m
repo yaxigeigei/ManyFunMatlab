@@ -1,5 +1,5 @@
 function [tb, preTb] = MakeTimeSeriesTable(t, s, varargin)
-% Organize time series data into a table that works in MSessionExplorer objects. 
+% Organize time series data into a 'timeSeries' table. 
 % Specifically, each row of this table contains data from a unique period of time, or 
 % an epoch (e.g. a trial). The first column named 'time' is reserved to contain vectors 
 % of timestamp. Other columns contain the corresponding samples. Epochs that do not have 

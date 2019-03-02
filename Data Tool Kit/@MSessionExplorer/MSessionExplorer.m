@@ -1,5 +1,7 @@
 classdef MSessionExplorer < handle
     %MSessionExplorer is a data container that makes data munging easy
+    % 
+    % See also MSessionExplorer.Event
     
     properties(Constant)
         supportedTableTypes = ... % 'eventTimes', 'eventValues', 'timeSeries' (read-only)
@@ -39,7 +41,7 @@ classdef MSessionExplorer < handle
             
             % Initialize table of tables
             totHeaders = {'tableType', 'tableData', 'referenceTime'};
-            this.tot = cell2table(cell(0, length(totHeaders)), 'VariableNames', totHeaders);
+            this.tot = cell2table(cell(0, numel(totHeaders)), 'VariableNames', totHeaders);
         end
         
         % Property IO
@@ -104,7 +106,9 @@ classdef MSessionExplorer < handle
             else
                 this.IValidateTableNames(varargin, true);
                 for i = 1 : numel(varargin)
-                    head(this.tot{varargin{i}, 'tableData'}{1})
+                    tb = this.tot{varargin{i}, 'tableData'}{1};
+                    indRow = 1 : min(6, height(tb));
+                    disp(tb(indRow,:));
                 end
             end
         end
@@ -117,8 +121,8 @@ classdef MSessionExplorer < handle
             %   se = Duplicate(tbNames, isUserData)
             % 
             % Inputs
-            %   tbNames             A string or cell array of table name(s) specifying which table(s) to include.
-            %                       An empty array (default) indicates all tables. 
+            %   tbNames             A cell array of table names specifying which tables to include. An empty 
+            %                       array (default) indicates all tables. 
             %   isUserData          A logical variable indicating whether or not to copy userData. Default true. 
             % Output
             %   se                  The new MSessionExplorer object
@@ -193,7 +197,7 @@ classdef MSessionExplorer < handle
         end
         
         function s = ToStruct(this)
-            % Convert the current MSessionExplorer object and all tables to structures
+            % Convert all the contents of this object to structures
             % 
             %   s = ToStruct()
             % 
@@ -204,12 +208,14 @@ classdef MSessionExplorer < handle
             %           referenceTime   a cell array of referece time
             %           tableData       a cell array of structs whose fields are each table's variables 
             %                           (output from MATLAB table2struct function)
+            %           epochInd        a vector of epoch indices
             %           userData        same as userData property
             
             s.tableName = this.tableNames;
             s.tableType = this.tot.tableType;
             s.referenceTime = this.tot.referenceTime;
             s.tableData = cellfun(@(x) table2struct(x), this.tot.tableData, 'Uni', false);
+            s.epochInd = this.epochInd;
             s.userData = this.userData;
         end
         
@@ -223,11 +229,11 @@ classdef MSessionExplorer < handle
             % Inputs:
             %   tbName              A string of the name of table to add or update. 
             %   tb                  The table variable.
-            %   tableType           Either 'eventTimes', 'eventValues', or 'timeSeries' indicating 
-            %                       the type of data table. It is required when adding a new table 
-            %                       but is ignored when updating an existing table.  
-            %   referenceTime       A numeric vector where each element stores the absolute time
-            %                       of the zero relative time of each epoch. Default is empty. 
+            %   tableType           'eventTimes', 'eventValues', or 'timeSeries' indicating the type of 
+            %                       data table. It is required when adding a new table but is ignored when 
+            %                       updating an existing table. 
+            %   referenceTime       A numeric vector where each element indicate the corresponding session 
+            %                       (absolute) time of the time zero in each epoch. Default is empty. 
             
             % Handle user input
             p = inputParser();
@@ -423,37 +429,37 @@ classdef MSessionExplorer < handle
         end
         
         % Data Operations
-        function AlignTime(this, refEvent, refSourceTbName)
-            % Align epochs by changing the origin of time in each epoch to the new reference event time
+        function AlignTime(this, et, sourceTbName)
+            % Align epochs by changing the origin of time in each epoch to the specified event times
             % 
-            %   AlignTime(refEvent)
-            %   AlignTime(refEvent, refSourceTbName)
+            %   AlignTime(et)
+            %   AlignTime(et, sourceTbName)
             %
             % Inputs
-            %   refEvent            An event name in a eventTimes table or a numeric vector of reference times 
-            %                       as zero time after alignment. Each element of the vector matches respective 
-            %                       row in tables. 
-            %   refSourceTbName     If refEvent is a string, then you must specify the name of eventTimes table 
-            %                       where this event name should be found. This avoids ambiguity of the same 
-            %                       variable name found in multiple tables. The default is empty. 
+            %   et              An event name in an eventTimes table or a numeric vector of times to align 
+            %                   to. Each time in the vector is relative wrt each row (epoch), which becomes 
+            %                   the new zero time after alignment. 
+            %   sourceTbName    If et is a string, then you must specify the name of an eventTimes table 
+            %                   where this event name should be found. This avoids ambiguity of the same 
+            %                   variable name found in multiple tables. The default is empty. 
             
             % Check eligible tables
             indAlignable = find(this.isEventTimesTable | this.isTimesSeriesTable);
             assert(~isempty(indAlignable), 'Requires at least one eventTimes or timeSeries table to operate on');
             
             % Get reference event times
-            if ischar(refEvent)
-                assert(nargin == 3, 'Requires refSourceTableName to indicate where ''%s'' is in', refEvent);
-                this.IValidateTableName(refSourceTbName, true);
-                refEvent = this.tot{refSourceTbName, 'tableData'}{1}.(refEvent);
+            if ischar(et)
+                assert(nargin == 3, 'Requires refSourceTableName to indicate where ''%s'' is in', et);
+                this.IValidateTableName(sourceTbName, true);
+                et = this.tot{sourceTbName, 'tableData'}{1}.(et);
             end
             
             % Validate reference event times
-            assert(isnumeric(refEvent) && isvector(refEvent), 'Reference times must be a numeric vector');
-            assert(numel(refEvent) == this.numEpochs, ...
+            assert(isnumeric(et) && isvector(et), 'Reference times must be a numeric vector');
+            assert(numel(et) == this.numEpochs, ...
                 'The number of reference times (%d) does not match the number of rows (%d) in data table.', ...
-                numel(refEvent), this.numEpochs);
-            refEvent = refEvent(:);
+                numel(et), this.numEpochs);
+            et = et(:);
             
             % Align times
             for k = indAlignable
@@ -463,10 +469,10 @@ classdef MSessionExplorer < handle
                     for i = 1 : size(tb, 2)
                         if isnumeric(tb{:,i})
                             % Numeric vector
-                            tb{:,i} = tb{:,i} - refEvent;
+                            tb{:,i} = tb{:,i} - et;
                         elseif iscell(tb{:,i})
                             % Cell vector of numeric vectors
-                            tb{:,i} = cellfun(@(x,r) x-r, tb{:,i}, num2cell(refEvent), 'Uni', false);
+                            tb{:,i} = cellfun(@(x,r) x-r, tb{:,i}, num2cell(et), 'Uni', false);
                         else
                             warning(fprintf('Failed to align data in the ''%s'' column of ''%s'' table\n', ...
                                 tb.Properties.VariableNames{i}, this.tableName{k}));
@@ -477,12 +483,12 @@ classdef MSessionExplorer < handle
                 elseif this.isTimesSeriesTable(k)
                     % For timeSeries table
                     this.tot.tableData{k}.time = cellfun(@(x,r) x-r, ...
-                        this.tot.tableData{k}.time, num2cell(refEvent), 'Uni', false);
+                        this.tot.tableData{k}.time, num2cell(et), 'Uni', false);
                 end
                 
                 % Change referenceTime
                 if ~isempty(this.tot.referenceTime{k})
-                    this.tot.referenceTime{k} = this.tot.referenceTime{k} + refEvent;
+                    this.tot.referenceTime{k} = this.tot.referenceTime{k} + et;
                 end
             end
         end
@@ -578,7 +584,7 @@ classdef MSessionExplorer < handle
                     for i = 1 : width(tb)
                         vect{i} = this.ICatColumn(tb.(i), tRef);
                     end
-                    this.tot.tableData{k} = MSessionExplorer.MakeEventTimesTable(vect, ...
+                    this.tot.tableData{k} = this.MakeEventTimesTable(vect, ...
                         'DelimiterTimes', tDelim, ...
                         'VariableNames', tb.Properties.VariableNames, ...
                         'Verbose', this.isVerbose);
@@ -587,9 +593,9 @@ classdef MSessionExplorer < handle
                     % For timeSeries table
                     vect{1} = this.ICatColumn(tb.time, tRef);
                     for i = 2 : width(tb)
-                        vect{i} = cat(1, tb.(i){:});
+                        vect{i} = this.ICatColumn(tb.(i));
                     end
-                    this.tot.tableData{k} = MSessionExplorer.MakeTimeSeriesTable(vect(1), vect(2:end), ...
+                    this.tot.tableData{k} = this.MakeTimeSeriesTable(vect(1), vect(2:end), ...
                         'DelimiterTimes', tDelim, ...
                         'VariableNames', tb.Properties.VariableNames, ...
                         'Verbose', this.isVerbose);
@@ -631,15 +637,15 @@ classdef MSessionExplorer < handle
             %                       All m windows will be applied to a single corresponding row, resulting in m rows 
             %                       in tbOut. Options for cell array length, n, are the same as described above. 
             %   rowInd              Integer or logical indices of rows to operate on and return. The default value is 
-            %                       empty indicating all rows. 
+            %                       [] indicating all rows. 
             %   colInd              Integer or logical indices of columns to operate on and return. It can also be 
-            %                       a cell array of column names of the input table. The default is empty indicating 
-            %                       all columns. 
+            %                       a cell array of column names of the input table. The default is [] indicating all 
+            %                       columns. 
             %   'Fill'              When tWin exceeds data in an epoch, 'none' (default) does not fill anything in 
             %                       exceeded parts; 'bleed' will look for data from neighboring epochs up to the 
             %                       entire session. 
-            %   'ReferenceTime'     Reference time to use with the 'bleed' option. The default value is empty and 
-            %                       the method will look for reference time associated with the specified table. 
+            %   'ReferenceTime'     Reference time to use with the 'bleed' option. The default value is [] and the 
+            %                       method will look for reference times associated with the specified table. 
             % Output
             %   tbOut               The output table with inquired time series data.
             
@@ -705,9 +711,8 @@ classdef MSessionExplorer < handle
             end
             winCells = cat(1, winCells{:});
             
-            % Make table
-            tbOut = table('Size', size(winCells), 'VariableTypes', repmat({'cell'}, [1 width(tbIn)]), ...
-                'VariableNames', tbIn.Properties.VariableNames);
+            % Make table where all variable type is cell
+            tbOut = cell2table(cell(size(winCells)), 'VariableNames', tbIn.Properties.VariableNames);
             tbOut{:,:} = winCells;
         end
         
@@ -730,10 +735,10 @@ classdef MSessionExplorer < handle
             %                       n must equal to the height of the table or the number of selected rows. All m 
             %                       windows in a m-by-2 matrix are applied to a corresponding row. 
             %   rowInd              Integer or logical indices of rows to operate on and return. The default value is 
-            %                       empty indicating all rows. 
+            %                       [] indicating all rows. 
             %   colInd              Integer or logical indices of columns to operate on and return. It can also be 
-            %                       a cell array of column names of the input table. The default is empty indicating 
-            %                       all columns. 
+            %                       a cell array of column names of the input table. The default is [] indicating all 
+            %                       columns. 
             %   'Fill'              When tWin exceeds an epoch, 'none' (default) ignores exceeded parts whereas 'bleed' 
             %                       looks for events from neighboring epochs up to the entire session. 
             %   'ReferenceTime'     Reference time to use with the 'bleed' option. The default value is empty and 
@@ -781,17 +786,16 @@ classdef MSessionExplorer < handle
             end
             winCells = cat(1, winCells{:});
             
-            % Make table
-            for k = width(tbIn) : -1 : 1
-                dtypes{k} = class(tbIn{1,k});
-            end
-            tbOut = table('Size', size(winCells), 'VariableTypes', dtypes, ...
-                'VariableNames', tbIn.Properties.VariableNames);
-            for k = 1 : width(tbOut)
-                try
-                    tbOut{:,k} = cell2mat(winCells(:,k));
-                catch
-                    tbOut.(k) = winCells(:,k);
+            % Make table with inherited data types
+            tbOut = table();
+            for k = 1 : width(tbIn)
+                varName = tbIn.Properties.VariableNames{k};
+                if isa(tbIn.(k), 'cell')
+                    tbOut.(varName) = winCells(:,k);
+                elseif all(cellfun(@isscalar, winCells(:,k)))
+                    tbOut.(varName) = cat(1, winCells{:,k});
+                else
+                    tbOut.(varName) = winCells(:,k);
                 end
             end
         end
@@ -887,7 +891,7 @@ classdef MSessionExplorer < handle
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
             p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
             
-            p.parse(varargin{:});
+            p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
             colInd = p.Results.colInd;
             
@@ -926,7 +930,7 @@ classdef MSessionExplorer < handle
     end
     
     % These methods are used internally
-    methods(Access = protected)
+    methods(Hidden, Access = protected)
         function val = IValidateTableName(this, tbName, isAssert)
             % The table name must be a string
             val = ischar(tbName);
@@ -1041,17 +1045,16 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function vect = ICatColumn(~, col, tRef)
-            if nargin < 3
-                tRef = zeros(size(col));
-            end
-            if iscell(col)
+        function C = ICatColumn(~, C, tRef)
+            if iscell(C)
                 % Cell vector of numeric array
-                colCells = cellfun(@(x,r) x+r, col, num2cell(tRef), 'Uni', false);
-                vect = cat(1, colCells{:});
-            else
+                if nargin > 2
+                    C = cellfun(@(x,r) x+r, C, num2cell(tRef), 'Uni', false);
+                end
+                C = cat(1, C{:});
+            elseif nargin > 2
                 % Numeric vector
-                vect = col + tRef;
+                C = C + tRef;
             end
         end
         
@@ -1103,6 +1106,7 @@ classdef MSessionExplorer < handle
         
         function winData = ISliceTsFillBleed(~, tbIn, tWin, rowInd, tRef)
             % Cache variables
+            isOldVer = verLessThan('matlab', '9.1');
             tAbs = cellfun(@(x,r) x + r, tbIn.time, num2cell(tRef), 'Uni', false);
             tAbsBegin = cellfun(@(x) x(1), tAbs);
             tAbsEnd = cellfun(@(x) x(end), tAbs);
@@ -1116,8 +1120,15 @@ classdef MSessionExplorer < handle
                 % Find time series for each window
                 for j = 1 : size(wAbs,1)
                     % Find relevant epochs
-                    isWinBeforeEpoch = all(tAbsBegin - wAbs(j,:) >= 0, 2);
-                    isWinAfterEpoch = all(wAbs(j,:) - tAbsEnd > 0, 2);
+                    if isOldVer
+                        dtWinBeforeEpoch = bsxfun(@minus, tAbsBegin, wAbs(j,:));
+                        dtWinAfterEpoch = bsxfun(@minus, wAbs(j,:), tAbsEnd);
+                    else
+                        dtWinBeforeEpoch = tAbsBegin - wAbs(j,:);
+                        dtWinAfterEpoch = wAbs(j,:) - tAbsEnd;
+                    end
+                    isWinBeforeEpoch = all(dtWinBeforeEpoch >= 0, 2);
+                    isWinAfterEpoch = all(dtWinAfterEpoch > 0, 2);
                     isWinOverlapEpoch = ~(isWinBeforeEpoch | isWinAfterEpoch);
                     srcRowInd = find(isWinOverlapEpoch);
                     
@@ -1170,6 +1181,7 @@ classdef MSessionExplorer < handle
         
         function winData = ISliceEtFillBleed(~, tbIn, tWin, rowInd, tRef)
             % Cache variables
+            isOldVer = verLessThan('matlab', '9.1');
             tAbs = cell(size(tbIn));
             for i = 1 : width(tbIn)
                 if isnumeric(tbIn{:,i})
@@ -1199,8 +1211,15 @@ classdef MSessionExplorer < handle
                     % Find event times in each window
                     for k = 1 : size(wAbs,1)
                         % Collect source epochs
-                        isWinBeforeEpoch = all(tAbsBegin(:,j) - wAbs(k,:) >= 0, 2);
-                        isWinAfterEpoch = all(wAbs(k,:) - tAbsEnd(:,j) > 0, 2);
+                        if isOldVer
+                            dtWinBeforeEpoch = bsxfun(@minus, tAbsBegin(:,j), wAbs(k,:));
+                            dtWinAfterEpoch = bsxfun(@minus, wAbs(k,:), tAbsEnd(:,j));
+                        else
+                            dtWinBeforeEpoch = tAbsBegin(:,j) - wAbs(k,:);
+                            dtWinAfterEpoch = wAbs(k,:) - tAbsEnd(:,j);
+                        end
+                        isWinBeforeEpoch = all(dtWinBeforeEpoch >= 0, 2);
+                        isWinAfterEpoch = all(dtWinAfterEpoch > 0, 2);
                         isWinOverlapEpoch = ~(isWinBeforeEpoch | isWinAfterEpoch);
                         srcRowInd = find(isWinOverlapEpoch);
                         
@@ -1222,6 +1241,13 @@ classdef MSessionExplorer < handle
                 end
             end
         end
+    end
+    
+    % These methods are object-independent
+    methods(Static)
+        [tb, preTb] = MakeTimeSeriesTable(t, s, varargin)
+        [tb, preTb] = MakeEventTimesTable(et, varargin)
+        se = UpdateOldObject(se)
     end
     
     methods(Hidden)
