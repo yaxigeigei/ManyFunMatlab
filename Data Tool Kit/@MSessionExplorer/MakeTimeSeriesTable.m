@@ -104,14 +104,14 @@ else
         tEpoch{i,1} = t(mask) - delimiterTimes(i);
         t(mask) = [];
     end
-    tPre = t;
+    tPre = {t};
     
     % Group data
     L = cellfun(@numel, [tPre; tEpoch]);
     s = cellfun(@(x) mat2cell(x, L), s, 'Uni', false);
     s = cat(2, s{:});
-    sPre = s(1:numel(tPre),:);
-    sEpoch = s(numel(tPre)+1:end,:);
+    sPre = s(1,:);
+    sEpoch = s(2:end,:);
 end
 
 % Put data into table

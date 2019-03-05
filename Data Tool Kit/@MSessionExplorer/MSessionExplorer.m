@@ -146,6 +146,7 @@ classdef MSessionExplorer < handle
             
             % Copying
             se = MSessionExplorer();
+            se.isVerbose = this.isVerbose;
             for i = tbInd(:)'
                 se.SetTable(this.tableNames{i}, this.tot.tableData{i}, this.tot.tableType{i}, this.tot.referenceTime{i});
             end
@@ -170,6 +171,7 @@ classdef MSessionExplorer < handle
             
             % Output SE
             se = MSessionExplorer();
+            se.isVerbose = this.isVerbose;
             
             % Concatenate and set each table
             for i = 1 : numel(this.tableNames)
@@ -182,7 +184,7 @@ classdef MSessionExplorer < handle
             end
             
             % Add incremented epoch indices
-            cumNumEp = cumsum(arrayfun(@(x) x.numEpochs, seArray));
+            cumNumEp = cumsum(arrayfun(@(x) max(x.epochInd), seArray));
             epInd = arrayfun(@(x) x.epochInd, seArray, 'Uni', false);
             epInd(2:end) = cellfun(@(x,y) x + y, num2cell(cumNumEp(1:end-1)), epInd(2:end), 'Uni', false);
             se.epochInd = cat(1, epInd{:});
@@ -265,7 +267,10 @@ classdef MSessionExplorer < handle
                 % Add a new table
                 assert(~isempty(tbType), 'Table type is required for adding a new table');
                 totHeaders = this.tot.Properties.VariableNames;
-                totRow = cell2table({tbType, tb, []}, 'VariableNames', totHeaders, 'RowNames', {tbName});
+                totRow = cell2table(cell(1,3), 'VariableNames', totHeaders, 'RowNames', {tbName});
+                totRow.tableType{1} = tbType;
+                totRow.tableData{1} = tb;
+                totRow.referenceTime{1} = [];
                 this.tot = [this.tot; totRow];
                 
                 % Initialize epoch indices
@@ -325,7 +330,7 @@ classdef MSessionExplorer < handle
             
             rt = rt(:);
             if ~all(diff(rt) > 0)
-                warning('The reference time is not monotonically increasing');
+                warning('Reference times are not monotonically increasing');
             end
             
             if nargin < 3
@@ -342,7 +347,7 @@ classdef MSessionExplorer < handle
                 if ~this.isEventValuesTable(strcmp(tbNames{i}, this.tableNames))
                     this.tot{tbNames{i}, 'referenceTime'}{1} = rt;
                 else
-                    warning('''%s'' is an eventValue table and reference time is not applicable', tbNames{i});
+                    warning('''%s'' is an eventValues table and reference time is not applicable', tbNames{i});
                 end
             end
         end
@@ -372,60 +377,98 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function RemoveEpochs(this, ind2rm)
-            % Remove specific epochs across all tables
+        function RemoveEpochs(this, row2rm)
+            % Remove specific rows across all tables
             % 
-            %   RemoveEpochs(ind2rm)
+            %   RemoveEpochs(row2rm)
             %
             % Input
-            %   ind2rm          Integer or logical indices of epochs to remove. 
+            %   row2rm          Integer or logical indices of rows to remove. 
             
             for k = 1 : height(this.tot)
-                this.tot.tableData{k}(ind2rm,:) = [];
+                this.tot.tableData{k}(row2rm,:) = [];
                 if ~isempty(this.tot.referenceTime{k})
-                    this.tot.referenceTime{k}(ind2rm) = [];
+                    this.tot.referenceTime{k}(row2rm) = [];
                 end
             end
-            this.epochInd(ind2rm) = [];
+            this.epochInd(row2rm) = [];
         end
         
-        function colData = GetColumn(this, tbName, colNames)
+        function colData = GetColumn(this, tbName, colIDs)
             % Return specific columns from a data table
             %
             %   colData = GetColumn(tbName, colNames)
             %
             % Inputs
-            %   tbName          The name of a table that contains the columns.
-            %   colNames        Column name(s) as a string or a cell array of strings. 
+            %   tbName          The name of a table that contains the columns of interest. 
+            %   colIDs          1) Column name(s) as a string or a cell array of strings. 
+            %                   2) Integer or logical indices of column. 
             % Output
             %   colData         Requsted data. 
             
             this.IValidateTableName(tbName, true);
-            colData = this.tot{tbName, 'tableData'}{1}{:,colNames};
+            tb = this.tot{tbName, 'tableData'}{1};
+            colData = tb{:,colIDs};
         end
         
-        function SetColumn(this, tbName, colNames, colData)
+        function SetColumn(this, tbName, colIDs, colData, rowScope)
             % Add, update or delete column(s) in a data table
             %
-            %   SetColumn(tbName, colNames, colData)
+            %   SetColumn(tbName, colIDs, colData)
+            %   SetColumn(tbName, colIDs, func, rowScope)
             %
             % Inputs
-            %   tbName          The name of a table that contains the column. 
-            %   colNames        Column name(s) as a string or a cell array of strings. 
+            %   tbName          The name of a table that contains the columns of interest. 
+            %   colIDs          1) Column name(s) as a string or a cell array of strings. 
+            %                   2) Integer or logical indices of column. 
             %   colData         Data to add or update. Use [] to delete. 
+            %   func            A function handle that receives one input and gives one output. 
+            %   rowScope        'each' or 'all'. 'each' applies func to each row separately, whereas 
+            %                   'all' applies to all rows (concatenated) as one continuous series. 
             
-            tb = this.GetTable(tbName);
-            colNames = cellstr(colNames);
-            for i = 1 : numel(colNames)
-                if isempty(colData)
-                    % Remove variable
-                    tb.(colNames{i}) = [];
-                else
-                    % Set values
-                    tb.(colNames{i}) = colData(:,i);
+            this.IWarnBeta();
+            
+            this.IValidateTableName(tbName, true);
+            tb = this.tot{tbName, 'tableData'}{1};
+            
+            if isempty(colData)
+                % Remove variable
+                colInd = this.IValidateColumnIndexing(tb, colIDs);
+                colInd = unique(colInd);
+                for i = numel(colInd) : -1 : 1
+                    tb.(colInd(i)) = [];
                 end
+            elseif isa(colData, 'function_handle') && nargin > 4
+                % Apply user function
+                func = colData;
+                colInd = this.IValidateColumnIndexing(tb, colIDs);
+                for k = 1 : numel(colInd)
+                    C = tb.(colInd(k));
+                    if strcmp(rowScope, 'each')
+                        if iscell(C)
+                            C = cellfun(func, C, 'Uni', false);
+                        else
+                            C = arrayfun(func, C);
+                        end
+                    elseif strcmp(rowScope, 'all')
+                        if iscell(C)
+                            L = cellfun(@(x) size(x,1), C);
+                            C = func(cell2mat(C));
+                            C = mat2cell(C, L);
+                        else
+                            C = func(C);
+                        end
+                    else
+                        error('scope must be ''each'' or ''all'' but was ''%s''', rowScope);
+                    end
+                    tb.(colInd(k)) = C;
+                end
+            else
+                % Set values
+                tb{:,colIDs} = colData;
             end
-            this.SetTable(tbName, tb);
+            
+            this.tot{tbName, 'tableData'}{1} = tb;
         end
         
         % Data Operations
@@ -524,31 +567,31 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function SliceSession(this, tSlice, refType)
+        function SliceSession(this, tSlice, tType)
             % Slice session into a different set of epochs
             % 
-            %   SliceSession(this, tSlice, refType)
+            %   SliceSession(tSlice, tType)
             %
             % Inputs
-            %   tSlice          A vector of times at which slicing occurs. Note that data before the first slicing 
-            %                   time will be irreversibly discarded. 
-            %                   If refType is 'relative', tSlice can be a scalar which is used by all epochs, or 
-            %                   a vector whose length matches the number epoch. 
-            %                   If refType is 'absolute', tSlice can be a vector of arbitrary length. 
-            %   refType         'absolute' or 'relative', indicating whether tSlice represents absolute times in 
-            %                   the session or is relative to epoch reference times. If using 'absolute', existing 
-            %                   epoch sorting, time alignment and all eventValues table will be lost due to an 
-            %                   unknown relationship between current and new epochs. New data will sort epochs in 
-            %                   temporal order and align epoch time to respective tSlice. 
+            %   tSlice      A vector of times at which slicing occurs. Note that data before the first slicing 
+            %               time will be irreversibly discarded. 
+            %               If refType is 'relative', tSlice can be a scalar which is used by all epochs, or 
+            %               a vector whose length matches the number epoch. 
+            %               If refType is 'absolute', tSlice can be a vector of arbitrary length. 
+            %   tType       'absolute' or 'relative', indicating whether tSlice represents absolute times in 
+            %               the session or is relative to epoch reference times. If using 'absolute', existing 
+            %               epoch sorting, time alignment and all eventValues table will be lost due to an 
+            %               unknown relationship between current and new epochs. New data will sort epochs in 
+            %               temporal order and align epoch time to respective tSlice. 
             
-            warning('This method is in beta version and should not be used for formal analysis');
+            this.IWarnBeta();
             
             % Validate inputs
             indTable = find(this.isEventTimesTable | this.isTimesSeriesTable);
             assert(~isempty(indTable), 'Requires at least one eventTimes or timeSeries table to operate on');
             assert(isnumeric(tSlice) && isvector(tSlice), 'Slicing times must be a numeric vector');
-            assert(ismember(refType, {'absolute', 'relative'}), ...
-                'refType must be ''absolute'' or ''relative'' but instead was %s', refType);
+            assert(ismember(tType, {'absolute', 'relative'}), ...
+                'refType must be ''absolute'' or ''relative'' but instead was %s', tType);
             
             % Restore epoch order
             [~, indBack] = sort(this.epochInd);
@@ -562,7 +605,7 @@ classdef MSessionExplorer < handle
                 assert(~isempty(tRef), 'To reslice, a table must have associated reference times');
                 
                 % Convert slicing times
-                if strcmp(refType, 'absolute')
+                if strcmp(tType, 'absolute')
                     if numel(tSlice) ~= numel(this.numEpochs)
                         assert(~any(this.isEventValuesTable), ...
                             'The number of epoch cannot be changed due to the presence of eventValues table(s)');
@@ -603,10 +646,10 @@ classdef MSessionExplorer < handle
                 this.tot.referenceTime{k} = tDelim;
             end
             
-            if strcmp(refType, 'absolute')
+            if strcmp(tType, 'absolute')
                 % Remove any eventValues table
                 if any(this.isEventValuesTable)
-                    warning('All eventValues table will be removed when using ''%s'' times', refType);
+                    warning('All eventValues table will be removed when using ''%s'' times', tType);
                     this.tot(this.isEventValuesTable,:) = [];
                 end
                 % Reset epochInd
@@ -615,188 +658,6 @@ classdef MSessionExplorer < handle
                 % Sort epoch order back
                 this.AlignTime(-tSlice);
                 this.SortEpochs(indBack);
-            end
-        end
-        
-        function tbOut = SliceTimeSeries(this, tbIn, tWin, varargin)
-            % Return slices of time series data using time windows
-            % 
-            %   tbOut = SliceTimeSeries(tbIn, tWin)
-            %   tbOut = SliceTimeSeries(tbIn, tWin, rowInd)
-            %   tbOut = SliceTimeSeries(tbIn, tWin, rowInd, colInd)
-            %   tbOut = SliceTimeSeries(..., 'Fill', 'none')
-            %   tbOut = SliceTimeSeries(..., 'ReferenceTime', [])
-            % 
-            % Inputs
-            %   tbIn                A table of time series data or the name of a timeSeries table in the object.
-            %   tWin                1) An n-by-2 matrix where each row has the begin and end time of a window. 
-            %                       When n equals 1, this window is applied to every rows. When n equals the height 
-            %                       of the table or the number of selected rows, each window is applied to respective 
-            %                       row. Inf values will be substuted by min or max time available, respectively. 
-            %                       2) An n-element cell array where each element is a m-by-2 matrix of time windows. 
-            %                       All m windows will be applied to a single corresponding row, resulting in m rows 
-            %                       in tbOut. Options for cell array length, n, are the same as described above. 
-            %   rowInd              Integer or logical indices of rows to operate on and return. The default value is 
-            %                       [] indicating all rows. 
-            %   colInd              Integer or logical indices of columns to operate on and return. It can also be 
-            %                       a cell array of column names of the input table. The default is [] indicating all 
-            %                       columns. 
-            %   'Fill'              When tWin exceeds data in an epoch, 'none' (default) does not fill anything in 
-            %                       exceeded parts; 'bleed' will look for data from neighboring epochs up to the 
-            %                       entire session. 
-            %   'ReferenceTime'     Reference time to use with the 'bleed' option. The default value is [] and the 
-            %                       method will look for reference times associated with the specified table. 
-            % Output
-            %   tbOut               The output table with inquired time series data.
-            
-            % Handle user inputs
-            p = inputParser();
-            p.addRequired('tbIn', @(x) ischar(x) || istable(x));
-            p.addRequired('tWin', @(x) isnumeric(x) || iscell(x));
-            p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
-            p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
-            p.addParameter('Fill', 'none', @(x) ismember(x, {'none', 'bleed', 'nan', 'nanbleed'}));
-            p.addParameter('ReferenceTime', [], @(x) isnumeric(x) && isvector(x));
-            
-            p.parse(tbIn, tWin, varargin{:});
-            rowInd = p.Results.rowInd(:);
-            colInd = p.Results.colInd(:);
-            fillMethod = p.Results.Fill;
-            tRef = p.Results.ReferenceTime;
-            
-            if ~istable(tbIn)
-                this.IValidateTableName(tbIn, true);
-                assert(ismember(tbIn, this.tableNames(this.isTimesSeriesTable)), ...
-                    '''%s'' is not a timeSeries table', tbIn);
-                tRef = this.GetReferenceTime(tbIn);
-                tbIn = this.GetTable(tbIn);
-            end
-            
-            % Validate and standardize row and column indices
-            [rowInd, colInd] = this.IValidateTableIndexing(rowInd, colInd, tbIn);
-            if ~ismember(1, colInd)
-                colInd = [1 colInd]; % make sure the time column is always included
-            end
-            tbIn = tbIn(:,colInd);
-            
-            % Validate and standardize time windows
-            tWin = this.IValidateTimeWindows(tWin, height(tbIn), rowInd);
-            
-            % Replace Inf with ends of timestamp
-            tBound = cellfun(@(x) x([1 end])', tbIn.time, 'Uni', false);
-            for i = 1 : numel(tWin)
-                bb = repmat(tBound{i}, size(tWin{i},1), 1);
-                isWinInf = isinf(tWin{i});
-                tWin{i}(isWinInf) = bb(isWinInf);
-            end
-            
-            % Slicing
-            switch fillMethod
-                case 'none'
-                    winCells = this.ISliceTsFillNone(tbIn, tWin, rowInd);
-                case 'nan'
-                    warning('''Fill'', ''nan'' may not be supported in a future version');
-                    winCells = this.ISliceTsFillNaN(tbIn, tWin, rowInd);
-                case 'bleed'
-                    assert(~isempty(tRef), 'Requires ''ReferenceTime'' to use ''%s''', fillMethod);
-                    winCells = this.ISliceTsFillBleed(tbIn, tWin, rowInd, tRef);
-                case 'nanbleed'
-                    warning('''Fill'', ''nanbleed'' may not be supported in a future version');
-                    assert(~isempty(tRef), 'Requires ''ReferenceTime'' to use ''%s''', fillMethod);
-                    tPan = cellfun(@(x) [min(x(:)) max(x(:))], tWin, 'Uni', false);
-                    winCells = this.ISliceTsFillBleed(tbIn, tPan, rowInd, tRef);
-                    winCells = cat(1, winCells{:});
-                    tbIn = cell2table(winCells, 'VariableNames', tbIn.Properties.VariableNames);
-                    winCells = this.ISliceTsFillNaN(tbIn, tWin(rowInd), 1:numel(rowInd));
-            end
-            winCells = cat(1, winCells{:});
-            
-            % Make table where all variable type is cell
-            tbOut = cell2table(cell(size(winCells)), 'VariableNames', tbIn.Properties.VariableNames);
-            tbOut{:,:} = winCells;
-        end
-        
-        function tbOut = SliceEventTimes(this, tbIn, tWin, varargin)
-            % Return slices of event time data using time windows
-            % 
-            %   tbOut = SliceEventTimes(tbIn, tWin)
-            %   tbOut = SliceEventTimes(tbIn, tWin, rowInd)
-            %   tbOut = SliceEventTimes(tbIn, tWin, rowInd, colInd)
-            %   tbOut = SliceEventTimes(..., 'Fill', 'none')
-            %   tbOut = SliceEventTimes(..., 'ReferenceTime', [])
-            % 
-            % Inputs
-            %   tbIn                A table of event times data or the name of a eventTimes table in the object. 
-            %   tWin                1) An n-by-2 matrix where each row has the begin and end time of a window. 
-            %                       When n equals 1, this window is applied to every rows. When n equals the height 
-            %                       of the table or the number of selected rows, each window is applied to respective 
-            %                       row. 
-            %                       2) An n-element cell array where each element is a m-by-2 matrix of time windows. 
-            %                       n must equal to the height of the table or the number of selected rows. All m 
-            %                       windows in a m-by-2 matrix are applied to a corresponding row. 
-            %   rowInd              Integer or logical indices of rows to operate on and return. The default value is 
-            %                       [] indicating all rows. 
-            %   colInd              Integer or logical indices of columns to operate on and return. It can also be 
-            %                       a cell array of column names of the input table. The default is [] indicating all 
-            %                       columns. 
-            %   'Fill'              When tWin exceeds an epoch, 'none' (default) ignores exceeded parts whereas 'bleed' 
-            %                       looks for events from neighboring epochs up to the entire session. 
-            %   'ReferenceTime'     Reference time to use with the 'bleed' option. The default value is empty and 
-            %                       the method will look for reference time associated with the specified table. 
-            % Output
-            %   tbOut               The output table with inquired event times data.
-            
-            % Handle user inputs
-            p = inputParser();
-            p.addRequired('tbIn', @(x) ischar(x) || istable(x));
-            p.addRequired('tWin', @(x) isnumeric(x) || iscell(x));
-            p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
-            p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
-            p.addParameter('Fill', 'none', @(x) any(strcmpi(x, {'none', 'bleed'})));
-            p.addParameter('ReferenceTime', [], @(x) isnumeric(x) && isvector(x));
-            
-            p.parse(tbIn, tWin, varargin{:});
-            rowInd = p.Results.rowInd;
-            colInd = p.Results.colInd;
-            fillMethod = lower(p.Results.Fill);
-            tRef = p.Results.ReferenceTime;
-            
-            if ~istable(tbIn)
-                this.IValidateTableName(tbIn, true);
-                assert(ismember(tbIn, this.tableNames(this.isEventTimesTable)), ...
-                    '''%s'' is not a eventTimes table', tbIn);
-                tRef = this.GetReferenceTime(tbIn);
-                tbIn = this.GetTable(tbIn);
-            end
-            
-            % Validate and standardize row and column indices
-            [rowInd, colInd] = this.IValidateTableIndexing(rowInd, colInd, tbIn);
-            tbIn = tbIn(:,colInd);
-            
-            % Validate and standardize time windows
-            tWin = this.IValidateTimeWindows(tWin, height(tbIn), rowInd);
-            
-            % Slicing
-            switch fillMethod
-                case 'none'
-                    winCells = this.ISliceEtFillNone(tbIn, tWin, rowInd);
-                case 'bleed'
-                    assert(~isempty(tRef), 'Requires ''ReferenceTime'' to use ''%s''', fillMethod);
-                    winCells = this.ISliceEtFillBleed(tbIn, tWin, rowInd, tRef);
-            end
-            winCells = cat(1, winCells{:});
-            
-            % Make table with inherited data types
-            tbOut = table();
-            for k = 1 : width(tbIn)
-                varName = tbIn.Properties.VariableNames{k};
-                if isa(tbIn.(k), 'cell')
-                    tbOut.(varName) = winCells(:,k);
-                elseif all(cellfun(@isscalar, winCells(:,k)))
-                    tbOut.(varName) = cat(1, winCells{:,k});
-                else
-                    tbOut.(varName) = winCells(:,k);
-                end
             end
         end
         
@@ -821,28 +682,26 @@ classdef MSessionExplorer < handle
             % Output
             %   tbOut           The output table of time series data where each value is the number of occurance. 
             
-            warning('This method is in beta version and should not be used for formal analysis');
+            this.IWarnBeta();
             
-            % Handle user inputs
+            % Parse inputs
             p = inputParser();
             p.addRequired('tbIn', @(x) ischar(x) || istable(x));
             p.addRequired('tEdges', @(x) iscell(x) || isnumeric(x));
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
             p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
-            
             p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
             colInd = p.Results.colInd;
             
+            % Get table
             if ~istable(tbIn)
-                this.IValidateTableName(tbIn, true);
-                assert(ismember(tbIn, this.tableNames(this.isTimesSeriesTable)), ...
-                    '''%s'' is not a timeSeries table', tbIn);
+                assert(this.IValidateTableName(tbIn, true) == 3, '''%s'' is not a timeSeries table', tbIn);
                 tbIn = this.GetTable(tbIn);
             end
             
             % Validate and standardize row and column indices
-            [rowInd, colInd] = this.IValidateTableIndexing(rowInd, colInd, tbIn);
+            [rowInd, colInd] = this.IValidateTableIndexing(tbIn, rowInd, colInd);
             if ~ismember(1, colInd)
                 colInd = [1 colInd]; % make sure the time column is always included
             end
@@ -882,31 +741,28 @@ classdef MSessionExplorer < handle
             % Output
             %   tbOut           The output table of time series data where each value is the number of occurance. 
             
-            warning('This method is in beta version and should not be used for formal analysis');
+            this.IWarnBeta();
             
-            % Handle user inputs
+            % Parse inputs
             p = inputParser();
             p.addRequired('tbIn', @(x) ischar(x) || istable(x));
             p.addRequired('tEdges', @(x) iscell(x) || isnumeric(x));
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
             p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
-            
             p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
             colInd = p.Results.colInd;
             
+            % Get table
             if ~istable(tbIn)
-                this.IValidateTableName(tbIn, true);
-                assert(ismember(tbIn, this.tableNames(this.isEventTimesTable)), ...
-                    '''%s'' is not a eventTimes table', tbIn);
+                assert(this.IValidateTableName(tbIn, true) == 1, '''%s'' is not an eventTimes table', tbIn);
                 tbIn = this.GetTable(tbIn);
             end
-            
             assert(~ismember('time', tbIn.Properties.VariableNames), ...
                 'The input table cannot contain variable named ''time'' since the output table requires it');
             
             % Validate and standardize row and column indices
-            [rowInd, colInd] = this.IValidateTableIndexing(rowInd, colInd, tbIn);
+            [rowInd, colInd] = this.IValidateTableIndexing(tbIn, rowInd, colInd);
             tbIn = tbIn(:,colInd);
             
             % Validate and standardize time edges
@@ -927,6 +783,9 @@ classdef MSessionExplorer < handle
             tbOut.time = cellfun(@(x) x(1:end-1)+diff(x)/2, tEdges, 'Uni', false);
             tbOut = tbOut(:,[end, 1:end-1]);
         end
+        
+        tbOut = SliceTimeSeries(this, tbIn, tWin, varargin)
+        tbOut = SliceEventTimes(this, tbIn, tWin, varargin)
     end
     
     % These methods are used internally
@@ -938,8 +797,10 @@ classdef MSessionExplorer < handle
             if ~val
                 return;
             end
-            % The table must exist
-            val = ismember(tbName, this.tableNames);
+            % Return 1, 2, 3 for the three table types, 0 if the table does not exist
+            tbTypes = this.isEventTimesTable + this.isEventValuesTable*2 + this.isTimesSeriesTable*3;
+            val = strcmp(tbName, this.tableNames) .* tbTypes';
+            val = sum(val);
             assert(isAssert && val, 'A table named ''%s'' does not exist', tbName);
         end
         
@@ -953,7 +814,27 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function [rowInd, colInd] = IValidateTableIndexing(~, rowInd, colInd, tb)
+        function colInd = IValidateColumnIndexing(~, tb, colIds)
+            % Validate and convert string and logical indexing to integer indices
+            if ischar(colIds) || iscellstr(colIds)
+                colIds = cellstr(colIds);
+                for i = numel(colIds) : -1 : 1
+                    mask = strcmp(colIds{i}, tb.Properties.VariableNames);
+                    assert(any(mask), 'Column ''%s'' cannot be found in the table', colIds{i});
+                    colInd(i) = find(mask);
+                end
+            elseif islogical(colIds)
+                assert(numel(colIds) == width(tb), ...
+                    'The number of logical indices (%d) do not match the number of table columns (%d)', ...
+                    numel(colIds), width(tb));
+                colInd = find(colIds);
+            else
+                colInd = colIds;
+            end
+            colInd = colInd(:)';
+        end
+        
+        function [rowInd, colInd] = IValidateTableIndexing(~, tb, rowInd, colInd)
             % Validate and convert row and column indices to integers 
             
             if isempty(rowInd)
@@ -1058,187 +939,9 @@ classdef MSessionExplorer < handle
             end
         end
         
-        function winData = ISliceTsFillNone(~, tbIn, tWin, rowInd)
-            % Find time series for each epoch
-            winData = cell(size(tWin));
-            for i = rowInd
-                t = tbIn.time{i};
-                w = tWin{i};
-                winData{i} = cell(size(w,1), width(tbIn));
-                
-                % Find time series for each window
-                for j = 1 : size(w,1)
-                    isInWin = w(j,1) <= t & t < w(j,2);
-                    winData{i}(j,:) = cellfun(@(x) x(isInWin,:), tbIn{i,:}, 'Uni', false);
-                end
-            end
-        end
-        
-        function winData = ISliceTsFillNaN(~, tbIn, tWin, rowInd)
-            % Find time series for each epoch
-            winData = cell(size(tWin));
-            for i = rowInd
-                t = tbIn.time{i};
-                dtPre = diff(t(1:2));
-                dtPost = diff(t(end-1:end));
-                w = tWin{i};
-                winData{i} = cell(size(w,1), width(tbIn));
-                
-                % Find time series for each window
-                for j = 1 : size(w,1)
-                    isInWin = w(j,1) <= t & t < w(j,2);
-                    
-                    % Make time stamps in exceeded parts
-                    tPre = flip(t(1)-dtPre : -dtPre : w(j,1))';
-                    tPre(tPre >= w(j,2)) = [];
-                    
-                    tPost = (t(end)+dtPost : dtPost : w(j,2))';
-                    tPost(tPost < w(j,1)) = [];
-                    
-                    % Indexing and filling
-                    winData{i}{j,1} = [tPre; t(isInWin,:); tPost];
-                    winData{i}(2:end) = cellfun( ...
-                        @(x) [NaN(numel(tPre), size(x,2)); x(isInWin,:); NaN(numel(tPost), size(x,2))], ...
-                        tbIn{i,2:end}, 'Uni', false);
-                end
-            end
-        end
-        
-        function winData = ISliceTsFillBleed(~, tbIn, tWin, rowInd, tRef)
-            % Cache variables
-            isOldVer = verLessThan('matlab', '9.1');
-            tAbs = cellfun(@(x,r) x + r, tbIn.time, num2cell(tRef), 'Uni', false);
-            tAbsBegin = cellfun(@(x) x(1), tAbs);
-            tAbsEnd = cellfun(@(x) x(end), tAbs);
-            
-            % Find time series for each epoch
-            winData = cell(size(tWin));
-            for i = rowInd
-                wAbs = tWin{i} + tRef(i);
-                winData{i} = cell(size(wAbs,1), width(tbIn));
-                
-                % Find time series for each window
-                for j = 1 : size(wAbs,1)
-                    % Find relevant epochs
-                    if isOldVer
-                        dtWinBeforeEpoch = bsxfun(@minus, tAbsBegin, wAbs(j,:));
-                        dtWinAfterEpoch = bsxfun(@minus, wAbs(j,:), tAbsEnd);
-                    else
-                        dtWinBeforeEpoch = tAbsBegin - wAbs(j,:);
-                        dtWinAfterEpoch = wAbs(j,:) - tAbsEnd;
-                    end
-                    isWinBeforeEpoch = all(dtWinBeforeEpoch >= 0, 2);
-                    isWinAfterEpoch = all(dtWinAfterEpoch > 0, 2);
-                    isWinOverlapEpoch = ~(isWinBeforeEpoch | isWinAfterEpoch);
-                    srcRowInd = find(isWinOverlapEpoch);
-                    
-                    % Sort relevant epochs in temporal order
-                    [~, ord] = sort(tRef(srcRowInd));
-                    srcRowInd = srcRowInd(ord);
-                    
-                    % Get masks
-                    isInWin = cellfun(@(x) wAbs(j,1) <= x & x < wAbs(j,2), tAbs(srcRowInd), 'Uni', false);
-                    
-                    % Find times
-                    tCells = cellfun(@(x,y) x(y)-tRef(i), tAbs(srcRowInd), isInWin, 'Uni', false);
-                    winData{i}{j,1} = vertcat(tCells{:});
-                    
-                    % Find data
-                    for k = 2 : width(tbIn)
-                        dataCells = cellfun(@(x,y) x(y,:), tbIn{srcRowInd,k}, isInWin, 'Uni', false);
-                        winData{i}{j,k} = vertcat(dataCells{:});
-                    end
-                end
-            end
-        end
-        
-        function winData = ISliceEtFillNone(~, tbIn, tWin, rowInd)
-            % Find event times for each epoch
-            winData = cell(size(tWin));
-            for i = rowInd
-                w = tWin{i};
-                winData{i} = cell(size(w,1), width(tbIn));
-                
-                % Find event times for each variable
-                for j = 1 : width(tbIn)
-                    % Get event times
-                    t = tbIn{i,j};
-                    if iscell(t)
-                        t = t{1};
-                    end
-                    
-                    % Find event times in each window
-                    for k = 1 : size(w,1)
-                        tHit = t(t >= w(k,1) & t < w(k,2));
-                        if isempty(tHit)
-                            tHit = NaN;
-                        end
-                        winData{i}{k,j} = tHit;
-                    end
-                end
-            end
-        end
-        
-        function winData = ISliceEtFillBleed(~, tbIn, tWin, rowInd, tRef)
-            % Cache variables
-            isOldVer = verLessThan('matlab', '9.1');
-            tAbs = cell(size(tbIn));
-            for i = 1 : width(tbIn)
-                if isnumeric(tbIn{:,i})
-                    tAbs(:,i) = num2cell(double(tbIn{:,i}) + tRef);
-                elseif iscell(tbIn{:,i})
-                    tAbs(:,i) = cellfun(@(x,r) double(x)+r, tbIn{:,i}, num2cell(tRef), 'Uni', false);
-                else
-                    error('Cannot convert relative time with this data format');
-                end
-            end
-            for i = 1 : numel(tAbs)
-                if isempty(tAbs{i})
-                    tAbs{i} = NaN;
-                end
-            end
-            tAbsBegin = cellfun(@(x) x(1), tAbs);
-            tAbsEnd = cellfun(@(x) x(end), tAbs);
-            
-            % Find event times for each epoch
-            winData = cell(size(tWin));
-            for i = rowInd
-                wAbs = tWin{i} + tRef(i);
-                winData{i} = cell(size(wAbs,1), width(tbIn));
-                
-                % Find event times for each variable
-                for j = 1 : width(tbIn)
-                    % Find event times in each window
-                    for k = 1 : size(wAbs,1)
-                        % Collect source epochs
-                        if isOldVer
-                            dtWinBeforeEpoch = bsxfun(@minus, tAbsBegin(:,j), wAbs(k,:));
-                            dtWinAfterEpoch = bsxfun(@minus, wAbs(k,:), tAbsEnd(:,j));
-                        else
-                            dtWinBeforeEpoch = tAbsBegin(:,j) - wAbs(k,:);
-                            dtWinAfterEpoch = wAbs(k,:) - tAbsEnd(:,j);
-                        end
-                        isWinBeforeEpoch = all(dtWinBeforeEpoch >= 0, 2);
-                        isWinAfterEpoch = all(dtWinAfterEpoch > 0, 2);
-                        isWinOverlapEpoch = ~(isWinBeforeEpoch | isWinAfterEpoch);
-                        srcRowInd = find(isWinOverlapEpoch);
-                        
-                        % Sort source epochs in temporal order
-                        [~, ord] = sort(tRef(srcRowInd));
-                        srcRowInd = srcRowInd(ord);
-                        
-                        % Get masks
-                        isInWin = cellfun(@(x) wAbs(k,1) <= x & x < wAbs(k,2), tAbs(srcRowInd,j), 'Uni', false);
-                        
-                        % Find times
-                        tCells = cellfun(@(x,y) x(y)-tRef(i), tAbs(srcRowInd,j), isInWin, 'Uni', false);
-                        t = vertcat(tCells{:});
-                        if isempty(t)
-                            t = NaN;
-                        end
-                        winData{i}{k,j} = t;
-                    end
-                end
+        function IWarnBeta(this)
+            if this.isVerbose
+                warning('This method\option is in beta version and should only be used in exploratory analysis');
             end
         end
     end
@@ -1251,6 +954,9 @@ classdef MSessionExplorer < handle
     end
     
     methods(Hidden)
+        % These methods are under development
+        % none
+        
         % These methods are for backward compatibility
         function SortTrials(this, ind)
             warning('SortTrials method will be removed in a future version. Use SortEpochs instead.');
