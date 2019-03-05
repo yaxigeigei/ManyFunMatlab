@@ -669,7 +669,7 @@ classdef MSessionExplorer < handle
             %   tbOut = ResampleTimeSeries(tbIn, tEdges, rowInd, colInd)
             % 
             % Inputs
-            %   tbIn            A table of event times data or a name of a eventTimes table in the current object.
+            %   tbIn            A table of time series data or a name of a timeSeries table in the current object.
             %   tEdges          Edges of time bins. This can be one numeric vector that defines edges for every 
             %                   rows, or a cell array of vectors where each applies to a corresponding row. The 
             %                   number of element in cell array must equal the height of the table or the number 
@@ -721,14 +721,14 @@ classdef MSessionExplorer < handle
         end
         
         function tbOut = ResampleEventTimes(this, tbIn, tEdges, varargin)
-            % Resample an eventTimes table to a timeSeries table by binning events
+            % Resample an eventTimes table to a timeSeries table by counting events in each bin
             % 
             %   tbOut = ResampleEventTimes(tbIn, tEdges)
             %   tbOut = ResampleEventTimes(tbIn, tEdges, rowInd)
             %   tbOut = ResampleEventTimes(tbIn, tEdges, rowInd, colInd)
             %   
             % Inputs
-            %   tbIn            A table of event times data or a name of a eventTimes table in the current object.
+            %   tbIn            A table of event times data or a name of an eventTimes table in the current object.
             %   tEdges          Edges of time bins. This can be one numeric vector that defines edges for every 
             %                   rows, or a cell array of vectors where each applies to a corresponding row. The 
             %                   number of element in cell array must equal the height of the table or the number 
