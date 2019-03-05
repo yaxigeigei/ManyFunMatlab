@@ -35,7 +35,7 @@ classdef MKilosort
     methods(Static)
         function Sort(datFilePath, fChanMap, fConfig)
             % Run spike sorting on a binary file. Results will be saved in the folder of .dat file.
-            % Auto merge is disabled and no imtermediate data is saved. 
+            % Auto merge is disabled and no intermediate data is saved. 
             % 
             %   MKilosort.Sort()
             %   MKilosort.Sort(datFilePath)

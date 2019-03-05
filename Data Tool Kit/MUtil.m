@@ -40,6 +40,43 @@ classdef MUtil
             hit = cellfun(@(x) any(regexp(str, x, 'once')), expressions);
             hit = any(hit);
         end
+        
+        function xlsTb = ReadXls(xlsPath, sheetId)
+            % General-purposed function to read a spreadsheet from Excel file
+            % 
+            %   xlsTb = Tongue.Util.ReadXls(xlsPath, sheetId)
+            % 
+            % Inputs
+            %   xlsPath         The path of an Excel file. If left empty, a file selection window 
+            %                   will show up.
+            %   sheetId         The index or name of a sheet for multi-sheet file. The default is
+            %                   the first sheet. 
+            % Output
+            %   xlsTb           The output table. 
+            % 
+            
+            if nargin < 2
+                sheetId = 1;
+            end
+            
+            % Browse for an Excel file
+            if ~exist(xlsPath, 'file')
+                xlsPath = MBrowse.File('', 'Choose an Excel spreadsheet', {'*.xlsx', '*.xls'});
+            end
+            
+            % Find spreadsheet index by name
+            if ischar(sheetId)
+                [~, sheetNames] = xlsfinfo(xlsPath);
+                sheetId = find(strcmpi(sheetId, sheetNames), 1);
+                if isempty(sheetId)
+                    error('The specified spreadsheet does not exist');
+                end
+            end
+            
+            % Load spreadsheet
+            xlsTb = readtable(xlsPath, 'Sheet', sheetId);
+        end
+        
     end
 end
 

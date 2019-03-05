@@ -1,10 +1,9 @@
 classdef MPlot
     %MPlot A collection of functions useful for plotting
-    %   
     
     methods(Static)
         function Blocks(xRange, yRange, color, varargin)
-            % Plot rectangle blocks based on X anf Y ranges (based on third party function drawShadedRectangle)
+            % Plot rectangles based on X anf Y ranges
             % 
             %   MPlot.Blocks(xRange, yRange)
             %   MPlot.Blocks(xRange, yRange, color)
@@ -13,13 +12,12 @@ classdef MPlot
             % Inputs:
             %   xRange      Boundary coordinates of block(s) along X-axis in a n-by-2 matrix where n is 
             %               the number of block(s) to plot. Alternatively, you can provide logical vector 
-            %               for X-axis where region(s) containing block(s) are set to true. If multiple 
-            %               Y-ranges are provided, 
-            %   yRange      Same cnvention as xRange but for Y-axis. 
+            %               for X-axis where region(s) containing block(s) are set to true. If n is 1, 
+            %               xRange will be expanded to match rows in yRange. 
+            %   yRange      Same as xRange but for Y-axis. 
             %   color       A 1-by-3 matrix of RGB color for uniform coloring or a 3-by-3 matrix of row 
             %               vectors for a gradient of colors. This parameter applies to all blocks. The 
             %               default color is uniform gray ([.9 .9 .9]).
-            %
             
             % Handles user inputs
             if nargin < 3
@@ -50,7 +48,7 @@ classdef MPlot
         end
         
         function h = Circle(x, y, r, c)
-            % Plot a shape of circle
+            % Plot a circle
             % 
             %   h = MPlot.Circle(x, y, r, c)
             %
@@ -61,19 +59,21 @@ classdef MPlot
             %   c       Color of the circle
             % Output:
             %   h       Object handle of the circle shape. By nature, it is a rectangle with rounded corners. 
-            %
             
             d = r*2;
             px = x-r;
             py = y-r;
-            h = rectangle('Position', [ px py d d ], 'Curvature', [1,1], 'FaceColor', c, 'LineStyle', 'none');
-            daspect([ 1 1 1 ]);
+            h = rectangle('Position', [px py d d], 'Curvature', [1 1], 'FaceColor', c, 'LineStyle', 'none');
+            daspect([1 1 1]);
         end
         
         function cc = Color2Str(cc)
+            % Convert n-by-3 RGB color array to strings in the form '%f,%f,%f'
+            % 
+            %   cc = Color2Str(cc)
             cc = mat2str(cc);
-            cc = strrep(cc(2:end), ' ', ',');
-            cc = strsplit(cc, ';');
+            cc = strrep(cc(2:end-1), ' ', ',');
+            cc = strsplit(cc, ';')';
         end
         
         function ErrorShade(varargin)
@@ -259,15 +259,12 @@ classdef MPlot
             % 
             % Output
             %   hh                  Handles of Line objects
-            % 
             
             p = inputParser();
             p.KeepUnmatched = true;
             p.addParameter('Orientation', 'vertical', @(x) any(strcmpi(x, {'vertical', 'horizontal'})));
-            
             p.parse(varargin{:});
             orientationStr = p.Results.Orientation;
-            
             varargin = p.Unmatched;
             
             x = x(:);
@@ -292,6 +289,93 @@ classdef MPlot
             end
         end
         
+        function varargout = PlotRaster(xx, varargin)
+            % Plot raster
+            % 
+            %   MPlot.PlotRaster(xx)
+            %   MPlot.PlotRaster(xx, yPos)
+            %   MPlot.PlotRaster(xx, yPos, d)
+            %   MPlot.PlotRaster(..., 'ColorArray', [])
+            %   MPlot.PlotRaster(..., 'LinePropertyName', value)
+            %   hh = MPlot.PlotRaster(...)
+            % 
+            % Inputs
+            %   xx                  1) A numeric vector of x coordinates that plots one row.
+            %                       3) A cell array of 1).
+            %                       2) A matrix whose columns are 1).
+            %   yPos                Y position of each row. 
+            %   d                   Length of line segments. It can be a scalar or an array for each line. 
+            %                       Will plot dots if set to zero (default). 
+            %   'ColorArray'        1) An n-by-3 array of RGB colors. n is the number of rows. 
+            %                       2) An n-by-4 array of RGBA colors. 'A'(alpha) controls transparency. 
+            %                       3) An n-element char vector of colors. (e.g. 'k', 'r', 'm')
+            %   Any PropertyName-Value pair for MATLAB built-in 'line' function. 
+            % 
+            % Output
+            %   hh                  Handles of plotted line objects. 
+            
+            % Parse inputs
+            p = inputParser();
+            p.KeepUnmatched = true;
+            p.PartialMatching = false;
+            
+            p.addRequired('xx');
+            p.addOptional('yPos', []);
+            p.addOptional('d', 0, @isnumeric);
+            p.addParameter('ColorArray', [], @(x) isnumeric(x) || ischar(x));
+            
+            p.parse(xx, varargin{:});
+            yPos = p.Results.yPos;
+            d = p.Results.d;
+            colorArray = p.Results.ColorArray;
+            varargin = p.Unmatched;
+            
+            % Format xx
+            if ~iscell(xx)
+                if isvector(xx)
+                    xx = xx(:);
+                end
+                xx = num2cell(xx, 1);
+            end
+            
+            % Format yPos
+            if isempty(yPos)
+                yPos = 0 : numel(xx)-1;
+            end
+            yPos = yPos(:)';
+            
+            % Plot rasters
+            for i = numel(xx) : -1 : 1
+                x = xx{i};
+                y = repmat(yPos(i), size(x));
+                if d
+                    hh(i) = MPlot.PlotPointAsLine(x, y, d, varargin);
+                else
+                    hh(i) = plot(x, y, '.', varargin);
+                end
+                if i == numel(xx)
+                    hold on;
+                end
+            end
+            
+            % Apply colors
+            if ~isempty(colorArray)
+                if ischar(colorArray)
+                    colorArray = colorArray(:);
+                elseif isvector(colorArray)
+                    colorArray = repmat(colorArray(:)', [numel(hh) 1]);
+                end
+                for i = 1 : numel(hh)
+                    hh(i).Color = colorArray(i,:);
+                end
+            end
+            
+            % Output
+            if nargout == 1
+                varargout{1} = hh;
+            end
+        end
+        
         function varargout = PlotTraceLadder(varargin)
             % Plot traces as a ladder
             % 
@@ -299,27 +383,26 @@ classdef MPlot
             %   MPlot.PlotTraceLadder(xx, yy)
             %   MPlot.PlotTraceLadder(xx, yy, yPos)
             %   MPlot.PlotTraceLadder(..., 'ColorArray', [])
-            %   MPlot.PlotTraceLadder(..., 'TraceFun', [])
             %   MPlot.PlotTraceLadder(..., 'LinePropertyName', value)
             %   hh = MPlot.PlotTraceLadder(...)
             % 
-            % Inputs:
-            %   xx                  1) A vector of x coordinates for all traces in yy. 
-            %                       2) A matrix of x coordinates for every point in yy.
-            %   yy                  Original y coordinates for each trace in column. 
+            % Inputs
+            %   yy                  1) A numeric vector of y coordinates that plots one trace.
+            %                       2) A matrix whose columns are 1).
+            %                       3) A cell array of 1). Vectors do not need to have the same length.
+            %   xx                  1) A vector of x coordinates that applies to all series in yy.
+            %                       2) A matrix of 1) as columns for individual series in yy.
+            %                       3) A cell array of 1) for individual series in yy.
             %   yPos                Y position of each trace's zero after shifting them into a ladder. 
             %   'ColorArray'        1) An n-by-3 array of RGB colors. n is the number of traces. 
             %                       2) An n-by-4 array of RGBA colors. 'A'(alpha) controls transparency. 
             %                       3) An n-element char vector of colors. (e.g. 'k', 'r', 'm')
-            %   'TraceFun'          A function handle that process each trace in yy. This function must not change
-            %                       the number of elements in each trace. 
             %   Any PropertyName-Value pair for MATLAB built-in 'line' function. 
             % 
-            % Output:
+            % Output
             %   hh                  Handles of plotted line objects. 
-            %
             
-            % Handle inputs
+            % Parse inputs
             p = inputParser();
             p.KeepUnmatched = true;
             p.PartialMatching = false;
@@ -327,40 +410,45 @@ classdef MPlot
             p.addRequired('arg1');
             p.addOptional('arg2', []);
             p.addOptional('yPos', []);
-            p.addParameter('ColorArray', [], @isnumeric);
-            p.addParameter('TraceFunc', [], @(x) isa(x,'function_handle'));
+            p.addParameter('ColorArray', [], @(x) isnumeric(x) || ischar(x));
             
             p.parse(varargin{:});
             arg1 = p.Results.arg1;
             arg2 = p.Results.arg2;
             yPos = p.Results.yPos;
             colorArray = p.Results.ColorArray;
-            traceFunc = p.Results.TraceFunc;
-            
             varargin = p.Unmatched;
             
             if ~isempty(arg2)
                 xx = arg1;
                 yy = arg2;
             else
-                yy = arg1;
                 xx = [];
+                yy = arg1;
             end
             
+            % Format yy
+            if iscell(yy)
+                cellfun(@(x) assert(isvector(x), 'Element of the cell array must be numeric vector'), yy);
+                yy = PadNaN(yy);
+            end
             if isvector(yy)
                 yy = yy(:);
             end
+            
+            % Format xx
             if isempty(xx)
                 xx = 1 : size(yy,1);
             end
+            if iscell(xx)
+                cellfun(@(x) assert(isvector(x), 'Element of the cell array must be numeric vector'), xx);
+                xx = PadNaN(xx);
+            end
             if isvector(xx)
-                xx = repmat(xx(:), 1, size(yy,2));
+                xx = repmat(xx(:), [1 size(yy,2)]);
             end
-            if ~isempty(traceFunc)
-                for i = 1 : size(yy,2)
-                    yy(:,i) = traceFunc(yy(:,i));
-                end
-            end
+            
+            % Format yPos
             if isempty(yPos)
                 yPos = cumsum(-min(yy) + [0, max(yy(:,1:end-1))]);
             end
@@ -369,18 +457,31 @@ classdef MPlot
             % Plot traces
             hh = plot(xx, yy+yPos, varargin);
             
+            % Apply colors
             if ~isempty(colorArray)
-                if isvector(colorArray)
+                if ischar(colorArray)
                     colorArray = colorArray(:);
+                elseif isvector(colorArray)
+                    colorArray = repmat(colorArray(:)', [numel(hh) 1]);
                 end
-                
-                for i = 1 : length(hh)
+                for i = 1 : numel(hh)
                     hh(i).Color = colorArray(i,:);
                 end
             end
             
+            % Output
             if nargout == 1
                 varargout{1} = hh;
+            end
+            
+            % Helper function
+            function vOut = PadNaN(vIn)
+                L = cellfun(@numel, vIn);
+                for c = numel(vIn) : -1 : 1
+                    vOut{c} = NaN(max(L), 1);
+                    vOut{c}(1:L(c)) = vIn{c};
+                end
+                vOut = cell2mat(vOut);
             end
         end
         
@@ -393,21 +494,10 @@ classdef MPlot
             %   numColors       The number of colors to return
             % Output:
             %   cc              A series of color in numColors-by-3 matrix ranging from red to violet. 
-            %
             
             cBase = { [ 1 1 0 0 0 1 ]; [ 0 1 1 1 0 0 ]; [ 0 0 0 1 1 1 ] };
             cc = cellfun(@(x) interp1(1:6, x, linspace(1,6,numColors)), cBase, 'UniformOutput', false);
             cc = cell2mat(cc)';
-        end
-        
-        function SaveFigure(h, filePath)
-            % Save figure as a PNG file
-            %
-            %   MPlot.SaveFigure(h, filePath)
-            %
-            
-            f = getframe(h);
-            imwrite(frame2im(f), [ filePath '.png' ]);
         end
         
         function barLength = ScaleBar(data, heightRatio)
@@ -435,100 +525,66 @@ classdef MPlot
             barLength = round(barLength, 1, 'significant');
         end
         
-        function ax = SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
-            % Set an axes with hard-coded positions
-            % 
-            %   MPlot.SetAxes(figHandle, gridSize, panelCoor, panelSize, panelSpacing, gridSpacing)
-            %
-            
-            if numel(panelSize) == 1
-                panelSize = panelSize([1 1]);
-            end
-            
-            if numel(panelSpacing) == 1
-                panelSpacing = panelSpacing([1 1]);
-            end
-            
-            if numel(gridSpacing) == 1
-                gridSpacing = gridSpacing([1 1]);
-            end
-            
-            % Make sure the figure has the right size
-            figSize = gridSpacing*2 + panelSize.*flip(gridSize) + panelSpacing.*flip(gridSize-1);
-            
-            figPos = get(figHandle, 'Position');
-            set(gcf, 'Position', [figPos(1:2), figSize]);
-            
-            % Compute panel parameters
-            panelPos(1) = gridSpacing(1) + (panelCoor(2)-1) * (panelSize(1) + panelSpacing(1));
-            panelPos(2) = figSize(2) - gridSpacing(2) - (panelCoor(1)-1) * (panelSize(2) + panelSpacing(2)) - panelSize(2);
-            
-            ax = axes;
-            set(ax, 'Unit', 'pixel', 'Position', [panelPos, panelSize]);
-        end
-        
-        function Violin(nn, bb, hh, varargin)
+        function varargout = Violin(pos, bb, nn, varargin)
             % Plot histograms as violins
             % 
-            %   MPlot.Violin(nn, bb, hh)
-            %   MPlot.Violin(nn, bb, hh, s)
+            %   MPlot.Violin(pos, bb, nn)
             %   MPlot.Violin(..., 'Color', 'k')
             %   MPlot.Violin(..., 'Alpha', 0.3)
             %   MPlot.Violin(..., 'Orientation', 'vertical')
             %   MPlot.Violin(..., 'Alignment', 'center')
+            %   h = MPlot.Violin(...)
             %
             % Inputs:
-            %   nn              
-            %   bb              
-            %   hh              
-            %   s               
-            %   'Color'         Color of the shade. Default is black. 
-            %   'Alpha'         Transparancy of the shade. Default 0.3. 
+            %   pos             An n-element vector indicating the position of n violin plots. 
+            %   bb              An array where each column contains bin centers of one violin plot.
+            %   nn              An array where each column contains widths of one violin plot.
+            %   'Color'         Face color of the violin plots. Default is black.
+            %   'Alpha'         Transparancy of the shade. Default 0.3.
             %   'Orientation'   Orientation of violins. Default is 'vertical'.
-            %   'Alignment'     
-            %
+            %   'Alignment'     The side of violins aligned to straight line. Default is 'center'.
+            % Output: 
+            %   hh              Handles of Patch object
             
             % Handles user inputs
             p = inputParser();
-            p.addOptional('s', 1, @isscalar);
             p.addParameter('Quantiles', [], @isnumeric);
             p.addParameter('Color', 'k');
             p.addParameter('Alpha', 1, @isnumeric);
-            p.addParameter('Orientation', 'vertical', @(x) any(strcmpi(x, {'vertical', 'horizontal'})));
-            p.addParameter('Alignment', 'center', @(x) any(strcmpi(x, {'low', 'high', 'center'})));
+            p.addParameter('Orientation', 'vertical', @(x) ismember(x, {'vertical', 'horizontal'}));
+            p.addParameter('Alignment', 'center', @(x) ismember(x, {'low', 'high', 'center'}));
             
             p.parse(varargin{:});
-            s = p.Results.s;
+            qt = p.Results.Quantiles;
             color = p.Results.Color;
             faceAlpha = p.Results.Alpha;
-            qt = p.Results.Quantiles;
             ori = p.Results.Orientation;
             alignType = p.Results.Alignment;
             
             % Ploting
             hold on;
-            for k = 1 : size(hh,2)
+            for k = size(nn,2) : -1 : 1
                 b = [bb(:,k); flip(bb(:,k))];
-                h = hh(:,k)/s;
+                n = nn(:,k);
                 
                 switch alignType
                     case 'center'
-                        h = nn(k) + [-h/2; flip(h/2)];
+                        n = pos(k) + [-n/2; flip(n/2)];
                     case 'low'
-                        h = nn(k) + [zeros(size(h)); flip(h)] - nanmax(h)/2;
+                        n = pos(k) + [zeros(size(n)); flip(n)] - nanmax(n)/2;
                     case 'high'
-                        h = nn(k) + [-h; zeros(size(h))] + nanmax(h)/2;
+                        n = pos(k) + [-n; zeros(size(n))] + nanmax(n)/2;
                 end
                 
                 if strcmp(ori, 'vertical')
-                    patch(h, b, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                    h(k) = patch(n, b, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
                 else
-                    patch(b, h, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                    h(k) = patch(b, n, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
                 end
             end
             
-            function computeMarks(d, qtVect)
-                
+            if nargout > 0
+                varargout{1} = h;
             end
         end
     end
