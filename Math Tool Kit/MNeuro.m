@@ -1,13 +1,18 @@
-classdef MNeural
-    %MNeural Summary of this class goes here
-    %   Detailed explanation goes here
-    
-    properties
-    end
+classdef MNeuro
     
     methods(Static)
         function ccg = CCG(tEdges, varargin)
-            % Compute all pairwise cross-correlograms
+            % Compute all pairwise cross-correlograms and auto-correlograms
+            %
+            %   ccg = CCG(tEdges, spkTrain1, spkTrain2, spkTrain3, ...)
+            %
+            % Inputs
+            %   tEdges          A vector of time bin, two-sided.
+            %   spkTrainN       A vector of spike time.
+            % Output
+            %   ccg             A [numTrain, numTrain, numBin] array of histograms. Each element 
+            %                   stores the number of pairwise intervals between two spike trains 
+            %                   whose values are in a range defined by the time bin. 
             
             % Handle user inputs
             spkTrains = varargin(:);
@@ -64,8 +69,38 @@ classdef MNeural
             ccg = ccg + flip(permute(ccg, [2 1 3]), 3);
         end
         
-        function [r, varargout] = Filter1(r, fs, methodOpt, varargin)
+        function [r, varargout] = FilterSpikeRate(r, fs, methodOpt, varargin)
+            % Filter spike rate or bin spike times using standard methods
             % 
+            % Bin spike times
+            %   [r, tEdges] = MNeural.Filter1(t, [], 'bin', tEdges)
+            %   [r, tEdges] = MNeural.Filter1(t, [], 'bin', tWin, binSize)
+            % 
+            % Smooth spike rate with Gaussian kernel
+            %   [r, ker] = MNeural.Filter1(r, fs, 'gaussian', sigma)
+            %   [r, ker] = MNeural.Filter1(r, fs, 'gaussian', sigma, kerSize)
+            % 
+            % Smooth spike rate with exponential kernel
+            %   [r, ker] = MNeural.Filter1(r, fs, 'exponential', tau)
+            %   [r, ker] = MNeural.Filter1(r, fs, 'exponential', tau, kerSize)
+            % 
+            % Inputs
+            %   t           A vector of spike time.
+            %   r           A vector of spike rate.
+            %   fs          Sampling rate of spike rate.
+            %   methodOpt   'bin', 'gaussian' or 'exponential'.
+            %   tEdges      A vector of bin edges.
+            %   tWin        A 2-element array indicating the start and end of binning.
+            %   binSize     Width of time bin.
+            %   sigma       Standard deviation of the Gausssian kernel in second.
+            %   tau         Time constant of the exponential kernal in second.
+            %   kerSize     Length of the kernel in second. The default is 6 sigma for 'gaussian' 
+            %               (i.e. 3 sigma each side) or 5 tau for 'exponential'. 
+            % Outputs
+            %   r           A vector of spike rate.
+            %   tEdges      A vector of bin edges.
+            %   ker         The kernel used for convolution.
+            
             if isvector(r)
                 r = r(:);
             end
@@ -73,7 +108,7 @@ classdef MNeural
             switch lower(methodOpt)
                 case 'bin'
                     % Bin spike times
-                    assert(all(diff(r) > 0), 'Spike times in r must be monotonically increase');
+                    assert(all(diff(r) > 0), 'Spike times in r must be monotonically increasing');
                     if numel(varargin) == 1
                         tEdges = varargin{1};
                     else

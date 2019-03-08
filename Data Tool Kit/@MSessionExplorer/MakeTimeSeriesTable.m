@@ -14,11 +14,10 @@ function [tb, preTb] = MakeTimeSeriesTable(t, s, varargin)
 %   t       1) A vector of timestamps. 
 %           2) A cell array of 1), each for one epoch. 'DelimeterTimes' is not supported 
 %              for this input. 
-%   s       1) A numeric vector of samples that matches the length of timestamps. 
-%           2) An numeric array of samples. The number of rows should match the number 
-%              of timestamps. 
-%           3) A 1-D cell array of 1) or 2). Each cell is treated as a different signal. 
-%           4) A 2-D cell array of 1) or 2) where columns are different signals and rows 
+%   s       1) An numeric array of samples. The number of rows should match the number 
+%              of timestamps. The number of columns can be 1 or more. 
+%           2) A 1-D cell array of 1). Each cell is treated as a different signal. 
+%           3) A 2-D cell array of 1) where columns are different signals and rows 
 %              are different epochs. 'DelimeterTimes' is not supported for this input. 
 %   'DelimiterTimes'
 %           A vector of time values indicating when to cut data into different epochs. 
@@ -55,15 +54,17 @@ if ~iscell(s)
     s = {s};
 end
 
-% Ensure column vectors
+% Verify timestamp vectors
 for i = 1 : numel(t)
-    if ~iscolumn(t{i})
-        t{i} = t{i}(:);
+    if isempty(t{i})
+        continue;
     end
-end
-for i = 1 : numel(s)
-    if isrow(s{i})
-        s{i} = s{i}';
+    assert(isvector(t{i}), 'Timestamps must be in vectors');
+    if isVerbose && ~all(diff(t{i}) > 0)
+        warning('Values in the #%d timestamp vector are not monotonically increasing', i);
+    end
+    if isrow(t{i})
+        t{i} = t{i}';
     end
 end
 
@@ -82,41 +83,27 @@ if isempty(delimiterTimes)
     assert(numel(t) == size(s,1), ...
         'There are %d vectors of timestamp and but %d epochs of data', numel(t), size(s,1));
     
-    tEpoch = t(:);
-    sEpoch = s;
-    tPre = cell(0,1);
-    sPre = cell(0, size(s,2));
-    
+    tEpoch = [cell(1); t(:)];
+    sEpoch = [cell(1,size(s,2)); s];
 else
     % Delimit signals by delimiter times
     if isVerbose
-        fprintf('Delimit time series data using %d delimiter times\n', numel(delimiterTimes));
+        fprintf('Delimit %d time series using %d delimiter times\n', numel(s), numel(delimiterTimes));
     end
+    assert(all(diff(delimiterTimes) > 0), 'Delimiter times must be monotonically increasing');
     assert(isvector(s), 'Cannot delimit time series data in cell array with more than one dimension');
-    s = s(:)';
-    assert(numel(t) == 1, 'Cannot delimit more than one series of timestamp');
-    t = t{1};
-    assert(all(diff(t) > 0), 'Timestamps must be monotonically increasing');
-    
-    % Group timestamps
-    for i = numel(delimiterTimes) : -1 : 1
-        mask = t >= delimiterTimes(i);
-        tEpoch{i,1} = t(mask) - delimiterTimes(i);
-        t(mask) = [];
-    end
-    tPre = {t};
+    assert(numel(t) == 1, 'Cannot delimit more than one vector of timestamps');
     
     % Group data
-    L = cellfun(@numel, [tPre; tEpoch]);
-    s = cellfun(@(x) mat2cell(x, L), s, 'Uni', false);
-    s = cat(2, s{:});
-    sPre = s(1,:);
-    sEpoch = s(2:end,:);
+    [tEpoch(:,i), L] = MSessionExplorer.IDelimitTimestamps(t{1}, delimiterTimes);
+    for i = numel(s) : -1 : 1
+        sEpoch(:,i) = mat2cell(s{i}, L);
+    end
 end
 
 % Put data into table
-tb = cell2table([tEpoch, sEpoch], 'VariableNames', varNames);
-preTb = cell2table([tPre, sPre], 'VariableNames', varNames);
+preTb = cell2table([tEpoch(1), sEpoch(1,:)], 'VariableNames', varNames);
+tb = cell2table([tEpoch(2:end), sEpoch(2:end,:)], 'VariableNames', varNames);
 
 end
 

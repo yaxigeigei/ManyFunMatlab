@@ -159,6 +159,11 @@ classdef Event
             % Return whether or not t properties of an object array are NaN
             val = isnan(this.IGet_t());
         end
+        function val = diff(this, varargin)
+            % Differences and Approximate Derivatives
+            % It uses the same inputs and outputs as MATLAB diff function
+            val = diff(double(this), varargin{:});
+        end
         function [this, ind] = sort(this, varargin)
             % Sorting elements in object array based on t property
             % It uses the same inputs and outputs as MATLAB sort function. 

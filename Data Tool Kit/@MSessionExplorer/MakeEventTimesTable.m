@@ -45,10 +45,20 @@ if ~iscell(et)
     et = {et};
 end
 
-% Ensure column vectors
+% Verify timestamp vectors
 for i = 1 : numel(et)
-    if ~iscolumn(et{i})
-        et{i} = et{i}(:);
+    if isempty(et{i})
+        continue;
+    end
+    assert(isvector(et{i}), 'Event times must be in vectors');
+    if isVerbose
+        etReal = et{i}(~isnan(et{i}));
+        if ~all(diff(etReal) > 0)
+            warning('Values in the #%d event time vector are not monotonically increasing', i);
+        end
+    end
+    if isrow(et{i})
+        et{i} = et{i}';
     end
 end
 
@@ -60,37 +70,29 @@ end
 if ~isempty(delimiterTimes)
     % Delimit event times by delimiter times
     if isVerbose
-        fprintf('Delimit event times data using %d delimiter times\n', numel(delimiterTimes));
+        fprintf('Delimit %d events using %d delimiter times\n', numel(et), numel(delimiterTimes));
     end
+    assert(all(diff(delimiterTimes) > 0), 'Delimiter times must be monotonically increasing');
     assert(isvector(et), 'Cannot delimit event times in cell array with more than one dimension');
-    et = et(:)';
     
     for i = numel(et) : -1 : 1
-        for j = numel(delimiterTimes) : -1 : 1
-            mask = et{i} >= delimiterTimes(j);
-            etEpoch{j,i} = et{i}(mask) - delimiterTimes(j);
-            et{i}(mask) = [];
-        end
-        et{i}(isnan(et{i})) = [];
+        etEpoch(:,i) = MSessionExplorer.IDelimitTimestamps(et{i}, delimiterTimes);
     end
-    etPre = et;
     
 elseif isVerbose
     % Each cell is an epoch
     if isVerbose
         disp('Delimiter is not specified. Each cell is treated as an epoch.');
     end
-    etEpoch = et;
-    etPre = cell(0, size(et,2));
+    etEpoch = [cell(1, size(et,2)); et];
 end
 
 % Fill empty cells
 etEpoch = FillEmpty(etEpoch);
-etPre = FillEmpty(etPre);
 
 % Put data into tables
-tb = cell2table(etEpoch, 'VariableNames', varNames);
-preTb = cell2table(etPre, 'VariableNames', varNames);
+preTb = cell2table(etEpoch(1,:), 'VariableNames', varNames);
+tb = cell2table(etEpoch(2:end,:), 'VariableNames', varNames);
 
 end
 

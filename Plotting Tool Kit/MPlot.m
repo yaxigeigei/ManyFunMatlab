@@ -411,12 +411,14 @@ classdef MPlot
             p.addOptional('arg2', []);
             p.addOptional('yPos', []);
             p.addParameter('ColorArray', [], @(x) isnumeric(x) || ischar(x));
+            p.addParameter('Scalar', 1, @isnumeric);
             
             p.parse(varargin{:});
             arg1 = p.Results.arg1;
             arg2 = p.Results.arg2;
             yPos = p.Results.yPos;
             colorArray = p.Results.ColorArray;
+            r = p.Results.Scalar;
             varargin = p.Unmatched;
             
             if ~isempty(arg2)
@@ -435,6 +437,7 @@ classdef MPlot
             if isvector(yy)
                 yy = yy(:);
             end
+            yy = yy .* r(:)';
             
             % Format xx
             if isempty(xx)

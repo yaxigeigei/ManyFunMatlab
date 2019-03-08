@@ -1,7 +1,30 @@
 classdef MSessionExplorer < handle
-    %MSessionExplorer is a data container that makes data munging easy
+    % MSessionExplorer is a data container that makes data munging easy
     % 
-    % See also MSessionExplorer.Event
+    %   For a tutorial, please check out examples in the following order (just copy a line and run).
+    %   Methods without examples should be well explained by help documents alone.
+    %   
+    %   Object Construction
+    %     MSessionExplorer.Examples.MakeEventTimesTable
+    %     MSessionExplorer.Examples.MakeTimeSeriesTable
+    %     MSessionExplorer.Examples.Duplicate
+    %     MSessionExplorer.Examples.Merge
+    % 
+    %   Content Management
+    %     MSessionExplorer.Examples.Preview
+    %     MSessionExplorer.Examples.SetTable
+    %     MSessionExplorer.Examples.SetReferenceTime
+    %     MSessionExplorer.Examples.SetColumn
+    % 
+    %   Data Operations
+    %     MSessionExplorer.Examples.AlignTime
+    %     MSessionExplorer.Examples.SliceSession
+    %     MSessionExplorer.Examples.SliceEventTimes
+    %     MSessionExplorer.Examples.SliceTimeSeries
+    %     MSessionExplorer.Examples.ResampleEventTimes
+    %     MSessionExplorer.Examples.ResampleTimeSeries
+    % 
+    % See also MSessionExplorer.Event, MPlot, MPlotter, MMath
     
     properties(Constant)
         supportedTableTypes = ... % 'eventTimes', 'eventValues', 'timeSeries' (read-only)
@@ -286,12 +309,12 @@ classdef MSessionExplorer < handle
         end
         
         function varargout = GetTable(this, varargin)
-            % Return specific data table(s)
+            % Return specific data table
             % 
             %   [tb1, tb2, tb3, ...] = GetTable(tbName1, tbName2, tbName3, ...)
             %
             % Input
-            %   tbNameN         The name of table to return. 
+            %   tbNameN         The name of a table to return. 
             % Output
             %   tbN             The table data. 
             
@@ -496,9 +519,13 @@ classdef MSessionExplorer < handle
                 this.IValidateTableName(sourceTbName, true);
                 et = this.tot{sourceTbName, 'tableData'}{1}.(et);
             end
+            if isscalar(et)
+                et = repmat(et, [this.numEpochs 1]);
+            end
             
             % Validate reference event times
             assert(isnumeric(et) && isvector(et), 'Reference times must be a numeric vector');
+            assert(~any(isnan(et)), 'Reference times cannot have NaN');
             assert(numel(et) == this.numEpochs, ...
                 'The number of reference times (%d) does not match the number of rows (%d) in data table.', ...
                 numel(et), this.numEpochs);
@@ -587,11 +614,12 @@ classdef MSessionExplorer < handle
             this.IWarnBeta();
             
             % Validate inputs
-            indTable = find(this.isEventTimesTable | this.isTimesSeriesTable);
-            assert(~isempty(indTable), 'Requires at least one eventTimes or timeSeries table to operate on');
+            indTimeTable = find(this.isEventTimesTable | this.isTimesSeriesTable);
+            assert(~isempty(indTimeTable), 'Requires at least one eventTimes or timeSeries table to operate on');
             assert(isnumeric(tSlice) && isvector(tSlice), 'Slicing times must be a numeric vector');
+            assert(~any(isnan(tSlice)), 'Slicing times cannot have NaN');
             assert(ismember(tType, {'absolute', 'relative'}), ...
-                'refType must be ''absolute'' or ''relative'' but instead was %s', tType);
+                'refType must be ''absolute'' or ''relative'' but instead was ''%s''', tType);
             
             % Restore epoch order
             [~, indBack] = sort(this.epochInd);
@@ -599,17 +627,18 @@ classdef MSessionExplorer < handle
             
             % Loop through tables
             tSlice = tSlice(:);
-            for k = indTable
+            for k = indTimeTable
+                % Show table name
+                if this.isVerbose
+                    fprintf('%s\t', this.tableNames{k});
+                end
+                
                 % Get reference times
                 tRef = this.tot.referenceTime{k};
                 assert(~isempty(tRef), 'To reslice, a table must have associated reference times');
                 
                 % Convert slicing times
                 if strcmp(tType, 'absolute')
-                    if numel(tSlice) ~= numel(this.numEpochs)
-                        assert(~any(this.isEventValuesTable), ...
-                            'The number of epoch cannot be changed due to the presence of eventValues table(s)');
-                    end
                     tDelim = tSlice;
                 else
                     if isscalar(tSlice)
@@ -617,7 +646,6 @@ classdef MSessionExplorer < handle
                     end
                     tDelim = tSlice + tRef;
                 end
-                assert(all(diff(tDelim) > 0), 'Slicing times must be monotonically increasing');
                 
                 % Slice table
                 tb = this.tot.tableData{k};
@@ -649,7 +677,7 @@ classdef MSessionExplorer < handle
             if strcmp(tType, 'absolute')
                 % Remove any eventValues table
                 if any(this.isEventValuesTable)
-                    warning('All eventValues table will be removed when using ''%s'' times', tType);
+                    warning('All eventValues table were removed when using ''%s'' times', tType);
                     this.tot(this.isEventValuesTable,:) = [];
                 end
                 % Reset epochInd
@@ -787,13 +815,18 @@ classdef MSessionExplorer < handle
         tbOut = SliceTimeSeries(this, tbIn, tWin, varargin)
         tbOut = SliceEventTimes(this, tbIn, tWin, varargin)
     end
+    methods(Static)
+        [tb, preTb] = MakeTimeSeriesTable(t, s, varargin)
+        [tb, preTb] = MakeEventTimesTable(et, varargin)
+        se = UpdateOldObject(se)
+    end
     
     % These methods are used internally
     methods(Hidden, Access = protected)
         function val = IValidateTableName(this, tbName, isAssert)
             % The table name must be a string
             val = ischar(tbName);
-            assert(isAssert && val, 'A table name must be a character array rather than %s.', class(tbName));
+            assert(~isAssert || val, 'A table name must be a character array rather than %s.', class(tbName));
             if ~val
                 return;
             end
@@ -801,7 +834,7 @@ classdef MSessionExplorer < handle
             tbTypes = this.isEventTimesTable + this.isEventValuesTable*2 + this.isTimesSeriesTable*3;
             val = strcmp(tbName, this.tableNames) .* tbTypes';
             val = sum(val);
-            assert(isAssert && val, 'A table named ''%s'' does not exist', tbName);
+            assert(~isAssert || val, 'A table named ''%s'' does not exist', tbName);
         end
         
         function val = IValidateTableNames(this, tbNames, isAssert)
@@ -930,7 +963,9 @@ classdef MSessionExplorer < handle
             if iscell(C)
                 % Cell vector of numeric array
                 if nargin > 2
-                    C = cellfun(@(x,r) x+r, C, num2cell(tRef), 'Uni', false);
+                    for i = 1 : numel(C)
+                        C{i} = C{i} + tRef(i);
+                    end
                 end
                 C = cat(1, C{:});
             elseif nargin > 2
@@ -941,16 +976,27 @@ classdef MSessionExplorer < handle
         
         function IWarnBeta(this)
             if this.isVerbose
-                warning('This method\option is in beta version and should only be used in exploratory analysis');
+                warning('This method or option is in beta version and should only be used in exploratory analysis');
             end
         end
     end
-    
-    % These methods are object-independent
-    methods(Static)
-        [tb, preTb] = MakeTimeSeriesTable(t, s, varargin)
-        [tb, preTb] = MakeEventTimesTable(et, varargin)
-        se = UpdateOldObject(se)
+    methods(Static, Access = private)
+        function [T, L] = IDelimitTimestamps(t, d)
+            % Find number of samples for each epoch based on timestamps and delimiter times
+            d = [d(:); Inf];        % delimiter times appended by Inf
+            L = zeros(size(d));     % epoch lengths
+            T = cell(size(d));      % timestamps in epochs
+            isIn = false(size(t));
+            for i = 1 : numel(d)
+                isBefore = t < d(i);
+                T{i} = t(isBefore & ~isIn);
+                L(i) = numel(T{i});
+                isIn = isBefore;
+            end
+            for i = 2 : numel(T)
+                T{i} = T{i} - d(i-1); % convert to relative time
+            end
+        end
     end
     
     methods(Hidden)
@@ -980,7 +1026,5 @@ classdef MSessionExplorer < handle
         end
     end
 end
-
-
 
 
