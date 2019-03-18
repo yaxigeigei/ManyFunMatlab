@@ -190,6 +190,9 @@ classdef MSessionExplorer < handle
             %   se                      The merged MSessionExplorer object
             
             % SEs to merge
+            for i = 1 : numel(varargin)
+                varargin{i} = varargin{i}(:);
+            end
             seArray = [this; cat(1, varargin{:})];
             
             % Output SE
@@ -449,8 +452,6 @@ classdef MSessionExplorer < handle
             %   rowScope        'each' or 'all'. 'each' applies func to each row separately, whereas 
             %                   'all' applies to all rows (concatenated) as one continuous series. 
             
-            this.IWarnBeta();
-            
             this.IValidateTableName(tbName, true);
             tb = this.tot{tbName, 'tableData'}{1};
             
@@ -611,8 +612,6 @@ classdef MSessionExplorer < handle
             %               unknown relationship between current and new epochs. New data will sort epochs in 
             %               temporal order and align epoch time to respective tSlice. 
             
-            this.IWarnBeta();
-            
             % Validate inputs
             indTimeTable = find(this.isEventTimesTable | this.isTimesSeriesTable);
             assert(~isempty(indTimeTable), 'Requires at least one eventTimes or timeSeries table to operate on');
@@ -695,6 +694,8 @@ classdef MSessionExplorer < handle
             %   tbOut = ResampleTimeSeries(tbIn, tEdges)
             %   tbOut = ResampleTimeSeries(tbIn, tEdges, rowInd)
             %   tbOut = ResampleTimeSeries(tbIn, tEdges, rowInd, colInd)
+            %   tbOut = ResampleTimeSeries(..., 'Method', 'linear')
+            %   tbOut = ResampleTimeSeries(..., 'Method', 'linear', 'Extrapolation', 'none')
             % 
             % Inputs
             %   tbIn            A table of time series data or a name of a timeSeries table in the current object.
@@ -707,10 +708,13 @@ classdef MSessionExplorer < handle
             %   colInd          Integer or logical indices of columns to operate on and return. It can also be 
             %                   a cell array of column names of the input table. The default is empty indicating 
             %                   all columns. 
+            %   'Method' and 'Extrapolation'
+            %                   Use these Name-Value pairs to customize the behavior of interpolation. Please see 
+            %                   options of the MATLAB griddedInterpolant function for details. 
             % Output
             %   tbOut           The output table of time series data where each value is the number of occurance. 
-            
-            this.IWarnBeta();
+            %
+            % See also griddedInterpolant
             
             % Parse inputs
             p = inputParser();
@@ -718,9 +722,13 @@ classdef MSessionExplorer < handle
             p.addRequired('tEdges', @(x) iscell(x) || isnumeric(x));
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
             p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
+            p.addParameter('Method', 'linear');
+            p.addParameter('Extrapolation', 'none');
             p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
             colInd = p.Results.colInd;
+            interpMethod = p.Results.Method;
+            extrapMethod = p.Results.Extrapolation;
             
             % Get table
             if ~istable(tbIn)
@@ -744,7 +752,13 @@ classdef MSessionExplorer < handle
                 t = tbOut.time{i};
                 tq = tEdges{i}(1:end-1) + diff(tEdges{i})/2;
                 tbOut.time{i} = tq;
-                tbOut{i,2:end} = cellfun(@(v) interp1(t, v, tq), tbOut{i,2:end}, 'Uni', false);
+                for j = 2 : width(tbOut)
+                    v = tbOut.(j){i};
+                    dtype = class(v);
+                    F = griddedInterpolant(t, double(v), interpMethod, extrapMethod);
+                    v = F(tq);
+                    tbOut.(j){i} = cast(v, dtype);
+                end
             end
         end
         
@@ -754,6 +768,7 @@ classdef MSessionExplorer < handle
             %   tbOut = ResampleEventTimes(tbIn, tEdges)
             %   tbOut = ResampleEventTimes(tbIn, tEdges, rowInd)
             %   tbOut = ResampleEventTimes(tbIn, tEdges, rowInd, colInd)
+            %   tbOut = ResampleEventTimes(..., 'Normalization', 'count')
             %   
             % Inputs
             %   tbIn            A table of event times data or a name of an eventTimes table in the current object.
@@ -766,10 +781,11 @@ classdef MSessionExplorer < handle
             %   colInd          Integer or logical indices of columns to operate on and return. It can also be 
             %                   a cell array of column names of the input table. The default is empty indicating 
             %                   all columns. 
+            %   'Normalization' See MATLAB histcounts function for detail.
             % Output
             %   tbOut           The output table of time series data where each value is the number of occurance. 
-            
-            this.IWarnBeta();
+            %
+            % See also histcounts
             
             % Parse inputs
             p = inputParser();
@@ -777,9 +793,11 @@ classdef MSessionExplorer < handle
             p.addRequired('tEdges', @(x) iscell(x) || isnumeric(x));
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
             p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
+            p.addParameter('Normalization', 'count');
             p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
             colInd = p.Results.colInd;
+            normMethod = p.Results.Normalization;
             
             % Get table
             if ~istable(tbIn)
@@ -804,7 +822,11 @@ classdef MSessionExplorer < handle
                 if isnumeric(et)
                     et = num2cell(et);
                 end
-                tbOut.(k) = cellfun(@(x,y) histcounts(x,y)', et, tEdges, 'Uni', false);
+                ts = cell(size(et));
+                for i = 1 : numel(et)
+                    ts{i} = histcounts(et{i}, tEdges{i}, 'Normalization', normMethod)';
+                end
+                tbOut.(k) = ts;
             end
             
             % Add time column
@@ -926,7 +948,7 @@ classdef MSessionExplorer < handle
             
             for i = 1 : numel(winOut)
                 % Verify array size
-                assert(~isempty(winOut{i}), 'Time window cannot be empty. Consider using [NaN NaN] instead');
+                assert(~isempty(winOut{i}), 'Time window cannot be empty. Consider using [NaN NaN].');
                 assert(size(winOut{i},2) == 2, 'Time window array must have 2 elements in each row');
                 % Verify time increment (ignore NaN windows)
                 dt = diff(winOut{i}, 1, 2);

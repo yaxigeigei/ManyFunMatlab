@@ -95,8 +95,8 @@ classdef MMath
             % 4) By default, it uses 10th-order elliptic (IIR) lowpass filter rather than 
             %    cheby1 or FIRs. 
             %    - fpass is fs/r/2 (i.e. Nyquist freq. of the output), fstop is ~1.2*fpass
-            %    - passband has ~1/1000th distorsion (ripple) aross different amplitudes
-            %    - stopband is attenuated >10000 times in amplitude
+            %    - passband has ~1/1000th uneveness (ripple) in amplitude (or 0.01dB)
+            %    - stopband is attenuated >10000 times in amplitude (or 80dB)
             % 5) User can provide custom digitalFilter object
             %   
             %   [x, D] = MMath.Decimate(x, r)

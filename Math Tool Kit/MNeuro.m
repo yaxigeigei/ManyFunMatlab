@@ -4,7 +4,7 @@ classdef MNeuro
         function ccg = CCG(tEdges, varargin)
             % Compute all pairwise cross-correlograms and auto-correlograms
             %
-            %   ccg = CCG(tEdges, spkTrain1, spkTrain2, spkTrain3, ...)
+            %   ccg = MNeuro.CCG(tEdges, spkTrain1, spkTrain2, spkTrain3, ...)
             %
             % Inputs
             %   tEdges          A vector of time bin, two-sided.
@@ -73,16 +73,16 @@ classdef MNeuro
             % Filter spike rate or bin spike times using standard methods
             % 
             % Bin spike times
-            %   [r, tEdges] = MNeural.Filter1(t, [], 'bin', tEdges)
-            %   [r, tEdges] = MNeural.Filter1(t, [], 'bin', tWin, binSize)
+            %   [r, tEdges] = MNeuro.FilterSpikeRate(t, [], 'bin', tEdges)
+            %   [r, tEdges] = MNeuro.FilterSpikeRate(t, [], 'bin', tWin, binSize)
             % 
             % Smooth spike rate with Gaussian kernel
-            %   [r, ker] = MNeural.Filter1(r, fs, 'gaussian', sigma)
-            %   [r, ker] = MNeural.Filter1(r, fs, 'gaussian', sigma, kerSize)
+            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'gaussian', sigma)
+            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'gaussian', sigma, kerSize)
             % 
             % Smooth spike rate with exponential kernel
-            %   [r, ker] = MNeural.Filter1(r, fs, 'exponential', tau)
-            %   [r, ker] = MNeural.Filter1(r, fs, 'exponential', tau, kerSize)
+            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'exponential', tau)
+            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'exponential', tau, kerSize)
             % 
             % Inputs
             %   t           A vector of spike time.
@@ -171,12 +171,12 @@ classdef MNeuro
         function t = JointTuning(varargin)
             % Calculates the joint probability distribution of multiple random variables
             %
-            %   t = GetJointDist(stimuli)
-            %   t = GetJointDist(stimuli, response)
-            %   t = GetJointDist(..., 'mask', logicals)
-            %   t = GetJointDist(..., 'numBins', numbers)
-            %   t = GetJointDist(..., 'rmMethod', options)
-            %   t = GetJointDist(..., 'rmParam', params)
+            %   t = MNeuro.JointTuning(stimuli)
+            %   t = MNeuro.JointTuning(stimuli, response)
+            %   t = MNeuro.JointTuning(..., 'mask', logicals)
+            %   t = MNeuro.JointTuning(..., 'numBins', numbers)
+            %   t = MNeuro.JointTuning(..., 'rmMethod', options)
+            %   t = MNeuro.JointTuning(..., 'rmParam', params)
             %   
             % Inputs:
             %   stimuli         Data of stimuli (each column is one stimulus).
@@ -287,59 +287,112 @@ classdef MNeuro
             end
         end
         
-        function [hh_mean, hh_sem, hh_stats] = MeanTimeHistogram(spk_times, t_edges, filterFunc)
-            % Compute time histogram and related stats from spike times
+        function [mm, ee, stats] = MeanEventRate(T, edges)
+            % Compute mean event rates and related stats from event times across repetitions
+            %
+            %   [mm, ee, stats] = MNeuro.MeanEventRate(T, edges)
+            %
+            % Inputs
+            %   T               A cell array or a table of event time vectors. Rows are repeats 
+            %                   (e.g. trials); columns are different types of event (e.g. units). 
+            %   edges           Edges of time bins in a numeric vector. 
+            % Outputs
+            %   mm              An array of mean event rates. Rows are time bins and columns are 
+            %                   different events. 
+            %   ee              Standard errors of mm. 
+            %   stats           A table with the following variables.
+            %     colNum          Column index of each event in T.
+            %     pkIdx           Index of the time bin where event rate peaks.
+            %     pkRate          Event rate at pkIdx.
+            %     pkProb          Probability of observing any event across repeats at pkIdx.
+            %     AUC             Area under the curve (i.e. the sum of event rates across time). 
+            %     entropy         Shannon's entropy of each trace.
             
-            if istable(spk_times)
-                spk_times = table2cell(spk_times);
+            % Check and standardize inputs
+            if istable(T)
+                T = table2cell(T);
             end
-            assert(iscell(spk_times), '');
-            if isvector(spk_times)
-                spk_times = spk_times(:);
-            end
+            assert(iscell(T), 'T must be a cell array or table.');
             
-            for i = size(spk_times,2) : -1 : 1
-                % Compute histogram for each trial
-                h_trials = cellfun(@(x) histcounts(x, t_edges), spk_times(:,i), 'Uni', false);
-                h_trials = cell2mat(h_trials);
-                
-                % Optionally filter spike counts
-                if nargin > 2
-                    h_trials = filterFunc(h_trials')';
+            for i = size(T,2) : -1 : 1
+                % Compute histogram for each repetition
+                hh = cell(size(T,1), 1);
+                for j = 1 : numel(hh)
+                    hh{j} = histcounts(T{j,i}, edges, 'Normalization', 'countdensity');
                 end
+                hh = cell2mat(hh);
                 
-                % Compute mean and sem of spike count
-                h_mean = mean(h_trials);
-                h_sem = MMath.StandardError(h_trials);
-                hh_mean(:,i) = h_mean;
-                hh_sem(:,i) = h_sem;
+                % Compute mean and sem of event rate
+                m = mean(hh);
+                e = MMath.StandardError(hh);
+                mm(:,i) = m;
+                ee(:,i) = e;
                 
                 % Compute other stats
-                [pk_count(i), pk_bin(i)] = max(h_mean);
-                pk_prob(i) = mean(h_trials(:,pk_bin(i)) > 0);
-                I(i) = MMath.Entropy(h_mean/sum(h_mean));
+                [pkRate(i), pkBin(i)] = max(m);
+                pkProb(i) = mean(hh(:,pkBin(i)) > 0);
+                I(i) = MMath.Entropy(m/sum(m));
             end
             
-            hh_stats = table();
-            hh_stats.unit_num = (1:size(spk_times,2))';
-            hh_stats.pk_bin = pk_bin';
-            hh_stats.pk_count = pk_count';
-            hh_stats.pk_prob = pk_prob';
-            hh_stats.spk_sum = sum(hh_mean)';
-            hh_stats.spk_scs = mean(cumsum(hh_mean./pk_count))';
-            hh_stats.entropy = I';
+            stats = table();
+            stats.colNum = (1:size(T,2))';
+            stats.pkIdx = pkBin';
+            stats.pkVal = pkRate';
+            stats.pkProb = pkProb';
+            stats.AUC = sum(mm)';
+            stats.entropy = I';
+        end
+        
+        function [mm, ee, stats] = MeanTimeSeries(S)
+            
+            % Check and standardize inputs
+            if isnumeric(S)
+                S = {S};
+            end
+            if istable(S)
+                S = table2cell(S);
+            end
+            assert(iscell(S), 'S must be a numeric vector, a cell array or a table.');
+            for i = 1 : numel(S)
+                assert(isnumeric(S{i}) && isvector(S{i}), 'Individual series must be numeric vector.')
+                if iscolumn(S{i})
+                    S{i} = S{i}';
+                end
+            end
+            
+            for i = size(S,2) : -1 : 1
+                % Concatenate rows
+                s = cell2mat(S(:,i));
+                
+                % Compute mean and sem
+                m = mean(s);
+                e = MMath.StandardError(s);
+                mm(:,i) = m;
+                ee(:,i) = e;
+                
+                % Compute other stats
+                [pkVal(i), pkIdx(i)] = max(m);
+                I(i) = MMath.Entropy(m/sum(m));
+            end
+            
+            stats = table();
+            stats.colNum = (1:size(S,2))';
+            stats.pkIdx = pkIdx';
+            stats.pkVal = pkVal';
+            stats.AUC = sum(mm)';
+            stats.entropy = I';
         end
         
         function tunings = Tuning(varargin)
             %Computes tuning curves (and errors) for given stimuli
             %
-            %   tunings = Tuning()
-            %   tunings = Tuning(stimuli)
-            %   tunings = Tuning(stimuli, response)
-            %   tunings = Tuning(..., 'mask', logicals)
-            %   tunings = Tuning(..., 'numBins', value)
-            %   tunings = Tuning(..., 'rmMethod', options)
-            %   tunings = Tuning(..., 'rmParam', params)
+            %   tunings = MNeuro.Tuning()
+            %   tunings = MNeuro.Tuning(stimuli)
+            %   tunings = MNeuro.Tuning(stimuli, response)
+            %   tunings = MNeuro.Tuning(..., 'mask', logicals)
+            %   tunings = MNeuro.Tuning(..., 'numBins', value)
+            %   tunings = MNeuro.Tuning(..., 'rmMethod', options)
+            %   tunings = MNeuro.Tuning(..., 'rmParam', params)
             %   
             % Inputs:
             %   stimuli         Data of stimuli (each column is one stimulus)

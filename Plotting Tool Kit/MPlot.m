@@ -2,14 +2,15 @@ classdef MPlot
     %MPlot A collection of functions useful for plotting
     
     methods(Static)
-        function Blocks(xRange, yRange, color, varargin)
+        function varargout = Blocks(xRange, yRange, color, varargin)
             % Plot rectangles based on X anf Y ranges
             % 
             %   MPlot.Blocks(xRange, yRange)
             %   MPlot.Blocks(xRange, yRange, color)
-            %   MPlot.Blocks(..., 'gradientOrientation', 'vertical')
+            %   MPlot.Blocks(..., 'PatchPropertyName', value)
+            %   p = MPlot.Blocks(...)
             %
-            % Inputs:
+            % Inputs
             %   xRange      Boundary coordinates of block(s) along X-axis in a n-by-2 matrix where n is 
             %               the number of block(s) to plot. Alternatively, you can provide logical vector 
             %               for X-axis where region(s) containing block(s) are set to true. If n is 1, 
@@ -18,6 +19,13 @@ classdef MPlot
             %   color       A 1-by-3 matrix of RGB color for uniform coloring or a 3-by-3 matrix of row 
             %               vectors for a gradient of colors. This parameter applies to all blocks. The 
             %               default color is uniform gray ([.9 .9 .9]).
+            %   Any PropertyName-Value pair of MATLAB patch function except for 'EdgeColor'.
+            %   
+            % Output
+            %   p           A Patch object, which can consist of one or more polygons. Use p to query or 
+            %               change properties of the patch object after it is created.
+            % 
+            % See also patch
             
             % Handles user inputs
             if nargin < 3
@@ -42,9 +50,12 @@ classdef MPlot
             end
             
             % Plots blocks
-            xx = [xRange, flip(xRange,2)]';
+            xx = xRange(:,[1 2 2 1])';
             yy = yRange(:,[1 1 2 2])';
-            patch(xx, yy, color, 'EdgeColor', 'none', varargin{:});
+            p = patch(xx, yy, color, 'EdgeColor', 'none', varargin{:});
+            if nargout > 0
+                varargout{1} = p;
+            end
         end
         
         function h = Circle(x, y, r, c)
@@ -393,11 +404,15 @@ classdef MPlot
             %   xx                  1) A vector of x coordinates that applies to all series in yy.
             %                       2) A matrix of 1) as columns for individual series in yy.
             %                       3) A cell array of 1) for individual series in yy.
+            %                       4) An empty array []. Use sample indices as x coordinates. 
             %   yPos                Y position of each trace's zero after shifting them into a ladder. 
-            %   'ColorArray'        1) An n-by-3 array of RGB colors. n is the number of traces. 
+            %   'ColorArray'        1) An n-by-3 array of RGB colors. 
             %                       2) An n-by-4 array of RGBA colors. 'A'(alpha) controls transparency. 
             %                       3) An n-element char vector of colors. (e.g. 'k', 'r', 'm')
-            %   Any PropertyName-Value pair for MATLAB built-in 'line' function. 
+            %                       When n equals the number of traces, colors are applied respectively. 
+            %                       When n equals 1, the color applies to all traces (same as using the 
+            %                       'Color' property). 
+            %   Any PropertyName-Value pair for MATLAB line function. 
             % 
             % Output
             %   hh                  Handles of plotted line objects. 
