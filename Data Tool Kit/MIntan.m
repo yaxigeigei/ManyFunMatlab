@@ -10,12 +10,14 @@ classdef MIntan
             %   ops = MIntan.GetOptions(signalList)
             %
             % Input
-            %   signalList          A string or a cell array of strings specifying the signal(s) of interest.
-            %                       Possible options are 'amplifier', 'aux_in', 'adc', 'dig_in'. The default
-            %                       is {'amplifier', 'aux_in', 'adc', 'dig_in'}.
+            %   signalList          A string or a cell array of strings specifying the signalName field (see below) of 
+            %                       each output struct. Possible options are 'amplifier', 'aux_in', 'adc', 'dig_in'. 
+            %                       The default is {'amplifier', 'aux_in', 'adc', 'dig_in'} which creates a four-element
+            %                       structure array. 
             % Output
-            %   ops                 Structure(s) of options used to specify the processig in MIntan.ReadRhdFiles.
-            %     signalName        The signal of interest from each element in signalList.
+            %   ops                 Structure(s) of options used to specify the processig in MIntan.ReadRhdFiles. Each 
+            %                       structure is independent from any others.
+            %     signalName        The name of signal source to read data from.
             %     signalFunc        A handle to a function that operates on the signal read from each file. The input to
             %                       this function is an [#channel,#sample] array. The output size should be consistent
             %                       with timestamps. The default is empty which does nothing.
@@ -166,7 +168,8 @@ classdef MIntan
                         
                         % Downsample data
                         sigData = reshape(sigData, [size(sigData,1), dsF, size(sigData,2)/dsF]);
-                        sigData = squeeze(median(sigData, 2));
+                        sigData = median(sigData, 2);
+                        sigData = permute(sigData, [1 3 2]);
                         sigTime = downsample(sigTime, dsF);
                     end
                     

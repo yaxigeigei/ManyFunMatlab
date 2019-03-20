@@ -12,8 +12,8 @@ function [tb, preTb] = MakeEventTimesTable(et, varargin)
 % Inputs
 %   et      1) A numeric vector of timestamps of an event. 
 %           2) A vector of objects of MSessionExplorer.Event class or superclass. 
-%           2) A 1-D cell array of 1) or 2). Each cell is treated as a different event. 
-%           3) A 2-D cell array of 1) or 2) where columns are different events and rows 
+%           3) A 1-D cell array of 1) or 2). Each cell is treated as a different event. 
+%           4) A 2-D cell array of 1) or 2) where columns are different events and rows 
 %              are different epochs. 'DelimeterTimes' is not supported for this input. 
 %   'DelimiterTimes'
 %           A vector of time values indicating when to cut data into different epochs. 
@@ -21,7 +21,7 @@ function [tb, preTb] = MakeEventTimesTable(et, varargin)
 %           Timestamps will be converted to relative times wrt the preceeding delimiter 
 %           time. The default value is [] which performs no delimiting. 
 %   'VariableNames'
-%           A cell array of column names for the output tables. The default names are 
+%           A cell array of column names for the output table. The default names are 
 %           {'event1', 'event2', 'event3', ...}. 
 %   'Verbose'
 %           A logical value that controls the display of progress. Default is true. 

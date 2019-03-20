@@ -69,37 +69,39 @@ classdef MNeuro
             ccg = ccg + flip(permute(ccg, [2 1 3]), 3);
         end
         
-        function [r, varargout] = FilterSpikeRate(r, fs, methodOpt, varargin)
-            % Filter spike rate or bin spike times using standard methods
+        function [r, varargout] = Filter1(r, fs, methodOpt, varargin)
+            % Filter activity or bin spike times using standard methods
+            % 
+            % Smooth trace with Gaussian kernel
+            %   [r, ker] = MNeuro.Filter1(r, fs, 'gaussian', sigma)
+            %   [r, ker] = MNeuro.Filter1(r, fs, 'gaussian', sigma, kerSize)
+            % 
+            % Smooth trace with exponential kernel
+            %   [r, ker] = MNeuro.Filter1(r, fs, 'exponential', tau)
+            %   [r, ker] = MNeuro.Filter1(r, fs, 'exponential', tau, kerSize)
             % 
             % Bin spike times
-            %   [r, tEdges] = MNeuro.FilterSpikeRate(t, [], 'bin', tEdges)
-            %   [r, tEdges] = MNeuro.FilterSpikeRate(t, [], 'bin', tWin, binSize)
-            % 
-            % Smooth spike rate with Gaussian kernel
-            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'gaussian', sigma)
-            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'gaussian', sigma, kerSize)
-            % 
-            % Smooth spike rate with exponential kernel
-            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'exponential', tau)
-            %   [r, ker] = MNeuro.FilterSpikeRate(r, fs, 'exponential', tau, kerSize)
+            %   [r, tEdges] = MNeuro.Filter1(t, [], 'bin', tEdges)
+            %   [r, tEdges] = MNeuro.Filter1(t, [], 'bin', tWin, binSize)
             % 
             % Inputs
             %   t           A vector of spike time.
             %   r           A vector of spike rate.
-            %   fs          Sampling rate of spike rate.
-            %   methodOpt   'bin', 'gaussian' or 'exponential'.
-            %   tEdges      A vector of bin edges.
-            %   tWin        A 2-element array indicating the start and end of binning.
-            %   binSize     Width of time bin.
+            %   fs          Sampling rate of r.
+            %   methodOpt   'gaussian', 'exponential', 'bin'.
             %   sigma       Standard deviation of the Gausssian kernel in second.
             %   tau         Time constant of the exponential kernal in second.
             %   kerSize     Length of the kernel in second. The default is 6 sigma for 'gaussian' 
             %               (i.e. 3 sigma each side) or 5 tau for 'exponential'. 
+            %   tEdges      A vector of bin edges.
+            %   tWin        A 2-element array indicating the start and end of binning.
+            %   binSize     Width of time bin.
             % Outputs
             %   r           A vector of spike rate.
-            %   tEdges      A vector of bin edges.
             %   ker         The kernel used for convolution.
+            %   tEdges      A vector of bin edges.
+            %
+            % See also: smooth, conv
             
             if isvector(r)
                 r = r(:);
@@ -298,15 +300,15 @@ classdef MNeuro
             %   edges           Edges of time bins in a numeric vector. 
             % Outputs
             %   mm              An array of mean event rates. Rows are time bins and columns are 
-            %                   different events. 
-            %   ee              Standard errors of mm. 
+            %                   different types of event. 
+            %   ee              Standard error of elements in mm. 
             %   stats           A table with the following variables.
             %     colNum          Column index of each event in T.
-            %     pkIdx           Index of the time bin where event rate peaks.
-            %     pkRate          Event rate at pkIdx.
+            %     pkIdx           Index of the time bin where each trace in mm peaks.
+            %     pkVal           The value of event rate at pkIdx.
             %     pkProb          Probability of observing any event across repeats at pkIdx.
-            %     AUC             Area under the curve (i.e. the sum of event rates across time). 
-            %     entropy         Shannon's entropy of each trace.
+            %     AUC             Area under the curve (i.e. the integral of each trace in mm). 
+            %     entropy         Shannon's entropy of each trace in mm.
             
             % Check and standardize inputs
             if istable(T)
@@ -344,6 +346,23 @@ classdef MNeuro
         end
         
         function [mm, ee, stats] = MeanTimeSeries(S)
+            % Compute mean and related stats of multiple time series across repetitions
+            %
+            %   [mm, ee, stats] = MNeuro.MeanTimeSeries(S)
+            %
+            % Inputs
+            %   S               A cell array or a table of time series vectors. Rows are repeats 
+            %                   (e.g. trials); columns are different signals (e.g. neurons). 
+            % Outputs
+            %   mm              An array of mean time series. Rows are samples and columns are for 
+            %                   different signals. 
+            %   ee              Standard error of elements in mm. 
+            %   stats           A table with the following variables.
+            %     colNum          Column index of each signal in T.
+            %     pkIdx           Index of the time bin where each trace in mm peaks.
+            %     pkVal           The value at pkIdx.
+            %     AUC             Area under the curve (i.e. the integral of each trace in mm). 
+            %     entropy         Shannon's entropy of each trace in mm.
             
             % Check and standardize inputs
             if isnumeric(S)

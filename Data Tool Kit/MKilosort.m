@@ -33,30 +33,52 @@ classdef MKilosort
     end
     
     methods(Static)
-        function Sort(datFilePath, fChanMap, fConfig)
+        function varargout = Sort(varargin)
             % Run spike sorting on a binary file. Results will be saved in the folder of .dat file.
             % Auto merge is disabled and no intermediate data is saved. 
             % 
             %   MKilosort.Sort()
             %   MKilosort.Sort(datFilePath)
-            %   MKilosort.Sort(datFilePath, fChanMap, fConfig)
+            %   MKilosort.Sort(..., 'ChannelMapFunc', [])
+            %   MKilosort.Sort(..., 'ConfigFunc', [])
+            %   MKilosort.Sort(..., 'AutoMerge', false)
+            %   MKilosort.Sort(..., 'GPU', true)
+            %   rez = MKilosort.Sort(...)
             % 
             % Inputs
             %   datFilePath         A binary file of extracellular recording data. If not specified, a file
             %                       selection window will be prompted. 
             %   
-            %   If either one of fChanMap or fConfig is not provided, a dialog box will allow you to choose a 
-            %   probe type for the preset configuration and channel map. 
+            %   If either one of 'ChannelMapFunc' or 'ConfigFunc' is not provided, a dialog box will allow you 
+            %   to choose a probe type for the preset configuration and channel map. 
             %   
-            %   fChanMap            A handle of a function that takes the folder path of the .dat file as input 
+            %   'ChannelMapFunc'    A function handle that takes the folder path of the .dat file as input 
             %                       and saves a chanMap.mat file to that folder. Examples can be found in the 
             %                       methods of this class (e.g. @MKilosort.SaveChanMapH3, modified from 
             %                       createChannelMapFile.m in the configFiles folder of Kilosort repository). 
-            %   fConfig             A handle of a function that takes the path of the .dat file as input and 
+            %   'ConfigFunc'        A function handle that takes the path of the .dat file as input and 
             %                       returns a structure of options. Examples can be found in the methods of this 
             %                       class (e.g. @MKilosort.Config64, modified from StandardConfig_MOVEME.m in 
-            %                       the configFiles folder of Kilosort repository). 
-            % 
+            %                       the configFiles folder of Kilosort repository).
+            %   'AutoMerge'         True or false (default).
+            %   'GPU'               Force Kilosort to use (true, default) or not to use (false) GPU. Note that 
+            %                       this option always overwrite ops.GPU. 
+            % Output
+            %   rez                 The raw clustering results that Kilosort outputs. 
+            
+            % Parse inputs
+            p = inputParser();
+            p.addOptional('datFilePath', [], @(x) ischar(x) || isempty(x));
+            p.addParameter('ChannelMapFunc', [], @(x) isa(x, 'function_handle'));
+            p.addParameter('ConfigFunc', [], @(x) isa(x, 'function_handle'));
+            p.addParameter('AutoMerge', false, @islogical);
+            p.addParameter('GPU', true, @islogical);
+            p.parse(varargin{:});
+            datFilePath = p.Results.datFilePath;
+            fChanMap = p.Results.ChannelMapFunc;
+            fConfig = p.Results.ConfigFunc;
+            isMerge = p.Results.AutoMerge;
+            isGPU = p.Results.GPU;
             
             % Find .dat file
             if nargin < 1
@@ -66,12 +88,16 @@ classdef MKilosort
                 return;
             end
             ksDir = fileparts(datFilePath);
+            if isempty(ksDir)
+                ksDir = pwd;
+            end
             
             % Choose a preset configuration and channel map functions
-            if nargin < 3
+            if isempty(fChanMap) || isempty(fConfig)
                 chanMapNames = properties(MKilosort);
                 probeNames = cellfun(@(x) x(8:end), chanMapNames, 'Uni', false);
-                selected = listdlg('PromptString', 'Select a preset configuration', ...
+                selected = listdlg( ...
+                    'PromptString', 'Select a preset configuration', ...
                     'SelectionMode', 'single', ...
                     'ListString', probeNames);
                 if isempty(selected)
@@ -99,6 +125,7 @@ classdef MKilosort
             
             % Get configuration structure
             ops = fConfig(datFilePath);
+            ops.GPU = isGPU;
             
             % Initialize GPU (will erase any existing GPU arrays)
             if ops.GPU
@@ -106,30 +133,41 @@ classdef MKilosort
             end
             
             % Preprocess data and extract spikes for initialization
-            reset(parallel.gpu.GPUDevice.current);
+            ResetGPU();
             [rez, DATA, uproj] = preprocessData(ops);
             
             % Fit templates iteratively
-            reset(parallel.gpu.GPUDevice.current);
+            ResetGPU();
             rez = fitTemplates(rez, DATA, uproj);
             
             % Extract final spike times (overlapping extraction)
-            reset(parallel.gpu.GPUDevice.current);
+            ResetGPU();
             rez = fullMPMU(rez, DATA);
             
-            % % AutoMerge. rez2Phy will use for clusters the new 5th column of st3 if you run this
-            % rez = merge_posthoc2(rez);
+            % AutoMerge. rez2Phy will use for clusters the new 5th column of st3 if you run this
+            if isMerge
+                rez = merge_posthoc2(rez);
+            end
             
             % save python results file for Phy
             rezToPhy(rez, ksDir);
             
             % % save matlab results file for future use (although you should really only be using the manually validated spike_clusters.npy file)
             % save(fullfile(fpath, 'rez.mat'), 'rez', '-v7.3');
+            if nargout > 0
+                varargout{1} = rez;
+            end
             
             % remove temporary file
             delete(ops.fproc);
-            reset(parallel.gpu.GPUDevice.current) % to free memory space!
+            ResetGPU(); % to free memory space!
             
+            % Helper function
+            function ResetGPU()
+                if isGPU
+                    reset(parallel.gpu.GPUDevice.current);
+                end
+            end
         end
         
         function result = ImportResults(ksDir)
