@@ -1,6 +1,5 @@
 classdef MMath
-    %MMath A collection of functions useful for doing math and manipulating data
-    %
+    % MMath is a collection of functions useful for doing math and manipulating data
     
     methods(Static)
         function [ci, btDist] = BootCI(nboot, bootfun, vect, varargin)
@@ -147,7 +146,7 @@ classdef MMath
         end
         
         function expect = Expectation(distMat, val, idxDim)
-            %Calculate expected values in the dimension of interest given other variables (assuming gaussian dist.)
+            %Calculate expected values in the dimension of interest given other variables
             %
             %   expect = MMath.Expectation(distMat, val, idxDim)
             %
@@ -229,36 +228,6 @@ classdef MMath
             end
             
             mask(ind) = true;
-        end
-        
-        function [ data, maskNaN ] = InterpNaN(data)
-            %Interpolates NaN values in the data
-            %
-            %   [ data, maskNaN ] = MMath.InterpNaN(data)
-            %
-            % Inputs:
-            %   data	    An array of column vector(s)
-            % Output:
-            %   data        An array of column vector(s) with NaN values interpolated
-            %   maskNaN     The logical mask of NaN values in the original data array
-            
-            if isrow(data)
-                data = data';
-            end
-            
-            maskNaN = isnan(data);
-            for i = 1 : size(data,2)
-                % Check for at least two non-NaN elements
-                if sum(maskNaN(:,i)) <= length(maskNaN(:,i)) - 2
-                    % Make sure NaN value exists in data
-                    if ~isempty(find(maskNaN(:,i),1))
-                        indv = find(~maskNaN(:,i));
-                        data(:,i) = interp1(indv, data(indv,i), (1:size(data,1))', 'linear', 'extrap');
-                    end
-                else
-                    warning('Needs at least two non-NaN elements for interpolation! Returns original values.');
-                end
-            end
         end
         
         function [ jointDist, axisLabels, binCoor ] = JointDist(randVars, numBins, axisLabels)
@@ -433,7 +402,7 @@ classdef MMath
             %Converts logical(boolean/binary) vector to tuples indicating the bondaries of 1 regions
             %e.g. [ 0 0 0 1 1 1 0 0 1 ] => bondaries [ 4 6; 9 9 ]
             %
-            %   bondariesInd = Logical2Bondaries(vect)
+            %   bondariesInd = MMath.Logical2Bounds(vect)
             %
             % Inputs:
             %   vect            A logical(boolean/binary) vector
@@ -451,14 +420,90 @@ classdef MMath
             boundariesInd = [ find(dVect == 1), find(dVect == -1) - 1 ];
         end
         
-        function y = Map(x, lowIn, highIn, lowOut, highOut)
-            if isempty(lowIn)
-                lowIn = nanmin(x);
+        function [m, sd, se, ci] = MeanStats(A, dim, varargin)
+            % Compute means, SDs, SEMs and bootstrap CIs from samples
+            %
+            %   [m, sd, se, ci] = MMath.MeanStats(A)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, isoutlierArg, ...)
+            %
+            % Inputs
+            %   A           Numeric array of samples.
+            %   dim         Dimension to operate along.
+            %   isoutlierArg, ...
+            %               One or more arguments for isoutlier function to remove outliers in A.
+            % Outputs
+            %   All otuputs has the same dimensionality as A with statistical values in the dim 
+            %   dimension. 
+            %   m           Mean values.
+            %   sd          Standard deviations.
+            %   se          Standard error of the mean.
+            %   ci          95% bootstrap confidence intervals.
+            
+            if isempty(A)
+                A = NaN;
             end
-            if isempty(highIn)
-                highIn = nanmax(x);
+            
+            if nargin < 2
+                if isscalar(A)
+                    dim = 1;
+                else
+                    dim = find(size(A) > 1, 1);
+                end
             end
-            y = (x - lowIn) ./ (highIn - lowIn) .* (highOut - lowOut) + lowOut;
+            
+            if numel(varargin) > 0
+                A(isoutlier(A, varargin{:}, dim)) = [];
+            end
+            
+            m = nanmean(A, dim);
+            sd = nanstd(A, 0, dim);
+            se = sd ./ sqrt(size(A,dim));
+            
+            if size(A,dim) < 2
+                ci = cat(dim, m, m);
+            else
+                % bootci can only sample along the first dimension, thus permuting A
+                dimOrder = [dim setdiff(1:ndims(A), dim)];
+                A = permute(A, dimOrder);
+                ci = bootci(1000, @nanmean, A);
+                
+                % Restore original dimension order
+                ci = permute(ci, [1 3:ndims(ci) 2]); % squeeze out the second (mean value) dimension
+                ci = ipermute(ci, dimOrder);
+            end
+        end
+        
+        function [m, qt, ad] = MedianStats(A, dim)
+            % Compute medians, 1st and 3rd quartiles and absolute deviations from samples
+            %
+            %   [m, qt, ad] = MMath.MedianStats(A)
+            %   [m, qt, ad] = MMath.MedianStats(A, dim)
+            %   [m, qt, ad] = MMath.MedianStats(A, dim, isoutlierArg, ...)
+            %
+            % Inputs
+            %   A           Numeric array of samples.
+            %   dim         Dimension to operate along. Default is the first non-singleton dimension. 
+            % Outputs
+            %   m           Median values.
+            %   qt          1st and 3rd quartiles.
+            %   ad          Median absolute deviation.
+            
+            if isempty(A)
+                A = NaN;
+            end
+            
+            if nargin < 2
+                if isscalar(A)
+                    dim = 1;
+                else
+                    dim = find(size(A) > 1, 1);
+                end
+            end
+            
+            m = nanmedian(A, dim);
+            qt = prctile(A, [25 75], dim);
+            ad = mad(A, 1, dim);
         end
         
         function I = MutualInfo(jointDist)
@@ -479,151 +524,12 @@ classdef MMath
         end
         
         function [corrVal, pVal] = NanCorr(x, y)
-            % Similar to MATLAB built-in function corr but handles NaN values
+            % Similar to MATLAB built-in function corr but ignores NaN values
             
             x = x(:);
             y = y(:);
             indNan = isnan(x) | isnan(y);
             [corrVal, pVal] = corr(x(~indNan), y(~indNan));
-        end
-        
-        function [ data, factors ] = Normalize(data, keepSign)
-            %Normalizes column vectors so that the maximal value or amplitude is one
-            %
-            %   [ data, factors ] = MMath.Normalize(data)
-            %   [ data, factors ] = MMath.Normalize(data, keepSign)
-            %
-            % Inputs:
-            %   data            Column vectors of data array
-            %   keepSign        Whether to keep the original sign of the data, i.e. normalize the maximal
-            %                   amplitude to one (rather than absolute value). (default is true)
-            % Output:
-            %   data            Normalized data
-            %   factors         Scaling factors used to normalize each column vectors. If the factor is zero,
-            %                   eps, the minimal amount of value in MATLAB, is returned.
-            
-            % Handles user inputs
-            if nargin < 2
-                keepSign = true;
-            end
-            
-            if isvector(data)
-                data = data(:);
-            end
-            
-            % Normalization
-            [ ~, maxInd ] = max(abs(data), [], 1);
-            
-            if ~isempty(maxInd)
-                for i = size(data,2) : -1 : 1
-                    factors(i) = data(maxInd(i),i);
-                    if factors(i) == 0
-                        factors(i) = eps;
-                    end
-                    if keepSign
-                        factors(i) = abs(factors(i));
-                    end
-                    data(:,i) = data(:,i) / factors(i);
-                end
-            end
-        end
-        
-        function [ data, factor, offset ] = Normalize2(data)
-            %Normalizes 2D array so that the maximal value or amplitude is
-            %one and the minimal value is zero
-            %
-            %   [ data, factors, offset ] = MMath.Normalize2(data)
-            %
-            % Inputs:
-            %   data            Numeric array
-            %   keepSign        Whether to keep the original sign of the data, i.e. normalize the maximal
-            %                   amplitude to one (rather than absolute value). (default is true)
-            % Output:
-            %   data            Normalized data
-            %   factors         Scaling factors used to normalize each column vectors. If the factor is zero,
-            %                   eps, the minimal amount of value in MATLAB, is returned.
-            
-            maxVal = nanmax(data(:));
-            minVal = nanmin(data(:));
-            
-            factor = maxVal - minVal;
-            offset = - minVal;
-            
-            data = (data + offset) / factor;
-        end
-        
-        function [ vect, indKept, lims ] = RemoveOutliers(varargin)
-            %Removes outliers
-            %
-            %   [ vect, indKept, lims ] = MMath.RemoveOutliers(vect)
-            %   [ vect, indKept, lims ] = MMath.RemoveOutliers(vect, boundParam)
-            %   [ vect, indKept, lims ] = MMath.RemoveOutliers(vect, boundParam, method)
-            %
-            % Inputs:
-            %   vect            A vector of numeric data
-            %   boundParam      Either (1) a positive scaler of the number of deviation or (2) a tuple specifying the
-            %                   numbers of deviation on each side respectively (e.g. [ numLower, numUpper ]).
-            %                   The default for standard deviation is [ 3 3 ], for whisker is [ 1.5 1.5 ], for
-            %                   percentile is [ 0.1 0.1 ].
-            %   method          'std' for removal based on the number of standard deviation (default);
-            %                   'whisker' based on the number of difference of 25 to 75 percentile value (same
-            %                   convention as MATLAB's built-in whisker plot);
-            %                   'percentile' removes the specified lower and upper percentage of data;
-            %                   'cut' uses actual cutoff thresholds to remove outliers.
-            % Output:
-            %   vect            The vector without outliers
-            %   indKept         The binary indices of values being kept
-            %   lims            A tuple containing values of lower and upper limit used for removal
-            
-            % Handles user inputs
-            p = inputParser();
-            p.addRequired('vect', @isnumeric);
-            p.addOptional('numDev', [], @(x) isnumeric(x) && numel(x) <= 2);
-            p.addOptional('method', 'std', @(x) any(strcmpi(x, {'std', 'whisker', 'percentile', 'cut'})));
-            p.parse(varargin{:});
-            vect = p.Results.vect(:);
-            boundParam = p.Results.numDev;
-            method = lower(p.Results.method);
-            
-            if isempty(boundParam)
-                switch method
-                    case 'std'
-                        boundParam = 3;
-                    case 'whisker'
-                        boundParam = 1.5;
-                    case 'cut'
-                        error('Must provide cutoff limits');
-                    case 'prctile'
-                        boundParam = .1;
-                end
-            end
-            
-            if numel(boundParam) == 1
-                boundParam = [ boundParam, boundParam ];
-            end
-            
-            % Outlier removal
-            if ~any(isnan(boundParam))
-                switch method
-                    case 'std'
-                        m = nanmean(vect);
-                        s = nanstd(vect);
-                        lims = [ m - boundParam(1)*s, m + boundParam(2)*s ];
-                    case 'whisker'
-                        q1 = prctile(vect, 25);
-                        q3 = prctile(vect, 75);
-                        lims = [ q1 - boundParam(1)*(q3-q1), q3 + boundParam(2)*(q3-q1) ];
-                    case 'cut'
-                        lims = sort(boundParam);
-                    case 'percentile'
-                        lims = [ prctile(vect, boundParam(1)), prctile(vect, 100-boundParam(2)) ];
-                end
-                indKept = vect >= lims(1) & vect <= lims(2);
-                vect = vect(indKept);
-            else
-                lims = [ -inf, inf ];
-                indKept = true(size(vect));
-            end
         end
         
         function y = SigMf(x, params)
@@ -666,28 +572,33 @@ classdef MMath
             y = 1./(1 + exp(-a*(x-c)));
         end
         
-        function [ stErr, stDev ] = StandardError(data, dim)
-            %Calculates the standard error of the population mean
+        function [se, sd] = StandardError(A, dim)
+            % Calculates the standard error of the population mean
             %
-            %   [ stErr, stDev ] = MMath.StandardError(data)
-            %   [ stErr, stDev ] = MMath.StandardError(data, dim)
+            %   [se, sd] = MMath.StandardError(A)
+            %   [se, sd] = MMath.StandardError(A, dim)
             %
-            % Inputs:
-            %   data	    An array of column vector(s)
-            % Output:
-            %   stErr       Standard error of the population mean
-            %   stDev       Standard deviation of the population
+            % Inputs
+            %   A           Numeric array of samples.
+            %   dim         Dimension to operate along.
+            % Outputs
+            %   se          Standard error of the population mean.
+            %   sd          Standard deviation of the population mean.
+            
+            if isempty(A)
+                A = NaN;
+            end
             
             if nargin < 2
-                dim = 1;
+                if isscalar(A)
+                    dim = 1;
+                else
+                    dim = find(size(A) > 1, 1);
+                end
             end
             
-            if isvector(data)
-                data = data(:);
-            end
-            
-            stDev = nanstd(data, 0, dim);
-            stErr = stDev / sqrt(size(data,dim));
+            sd = nanstd(A, 0, dim);
+            se = sd ./ sqrt(size(A,dim));
         end
     end
 end

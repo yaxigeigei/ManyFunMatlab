@@ -60,10 +60,10 @@ classdef MNeuro
                 s = s + 1;
             end
             
-            % Zero center bins of auto-correlograms (Phy does it but don't know why)
-            for i = 1 : nTrains
-                ccg(i,i,ceil(numel(tEdges)/2)) = 0;
-            end
+%             % Zero center bins of auto-correlograms (Phy does it but don't know why)
+%             for i = 1 : nTrains
+%                 ccg(i,i,ceil(numel(tEdges)/2)) = 0;
+%             end
             
             % Symmetrize matrices
             ccg = ccg + flip(permute(ccg, [2 1 3]), 3);
@@ -438,8 +438,8 @@ classdef MNeuro
             p.addParameter('rmParam', NaN, @isnumeric);
             p.addParameter('tfParam', NaN, @isnumeric);
             p.parse(varargin{:});
-            stim = MNeural.Vars2Mat(p.Results.stimuli);
-            resp = MNeural.Vars2Mat(p.Results.response);
+            stim = p.Results.stimuli;
+            resp = p.Results.response;
             dataMask = p.Results.mask;
             numBins = p.Results.numBins;
             rmParam = p.Results.rmParam;
@@ -523,36 +523,37 @@ classdef MNeuro
                 tunings{i,1} = [ centers; binMeanSpikeRate; binSteSpikeRate; binNumSample ]';
             end
         end
-    end
-    
-    methods(Static, Access = private)
-        function vars = Vars2Mat(vars)
-            % Converts heterogeneous and/or nested variable specifications to homogeneous numeric array
-            %
-            %   vars = Vars2Mat(vars)
-            %   
+        
+        function c = ClusterContamination(p, F, tauR, tauC)
+            % Estimate the contamination of a unit based on Hill et al. 2011
+            % 
+            %   c = MNeuro.ClusterContamination(p, F, tauR, tauC)
+            % 
             % Inputs
-            %   vars            Data of stimuli (each column is one stimulus).
-            % Output:
-            %   vars            Homogeneous numeric array of column vectors
+            %   p       Fraction of ISI violation.
+            %   F       Mean firing rate (spikes per second) of the unit.
+            %   tauR    Length of the refractory period in second. The default is 0.0025s.
+            %   tauC    The censored period (in second) following a spike during which spikes are 
+            %           not detected by the recording system. The default is 0s (e.g. Kilosort).
+            % Output
+            %   c       Fraction of contaminated spikes. Note that the maximal possible value is 
+            %           0.5.
             
-            try
-                if iscell(vars)
-                    % Nested cell array
-                    if isvector(vars)
-                        for i = 1 : length(vars)
-                            % De-nesting
-                            if iscell(vars{i})
-                                vars{i} = cell2mat(vars{i});
-                            end
-                        end
-                    end
-                    % Cell array
-                    vars = cell2mat(vars);
-                end
-            catch
-                error('The input cannot be resolved. Please check for the consistency of potential length of each column.');
+            % Compute time window constant
+            if nargin < 4
+                tauC = 0;
             end
+            if nargin < 3
+                tauR = 0.0025;
+            end
+            T = 2 * (tauR - tauC);
+            
+            % Compute term inside the square root
+            x = (4*p)./(F*T);
+            x(x>1) = 1;
+            
+            % Compute contamination rate
+            c = (1 - sqrt(1 - x)) / 2;
         end
     end
 end
