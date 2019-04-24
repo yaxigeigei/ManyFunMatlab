@@ -53,6 +53,29 @@ classdef MMath
             end
         end
         
+        function B = CombineDims(A, dims)
+            % Reshape array by combining specified dimensinons
+            % 
+            %   B = MMath.CombineDims(A, dims)
+            %
+            % Inputs
+            %   A           Numeric array.
+            %   dims        Dimensions to combine. Note that even [2 3] and [3 2] specify the same dimensions, 
+            %               the order of elements in the combined dimension will be different. 
+            % Output
+            %   B           Resulting array where the first dimension is the combined. 
+            
+            % Move dimensions of interest to the front
+            otherDims = setdiff(1:ndims(A), dims);
+            A = permute(A, [dims otherDims]);
+            
+            % Collapse specified dimensions by reshaping array
+            sz = [size(A) 1];
+            dims = 1 : numel(dims);
+            otherDims = numel(dims)+1 : numel(sz);
+            B = reshape(A, [prod(sz(dims)) sz(otherDims)]);
+        end
+        
         function [ condDist, margDist ] = ConditionalDist(jointDist, givenWhich)
             %Compute conditional probability distribution from joint distribution
             %
@@ -180,8 +203,8 @@ classdef MMath
             %   ind         An index or a vector of indices
             %   winRoi      A vector of relative indices (not a boundary tuple) indicating the region of interest
             %   valRange    Usually (1) a tuple of indexing boundaries (e.g. [ minIdx, maxIdx ])
-            %               or (2) a numeric vector or array of all allowed index values (number of elements must > 2) and
-            %               each index will be bound to the closest allowed value.
+            %               or (2) a numeric vector or array of all allowed index values (number of elements must > 2)
+            %               and each index will be bound to the closest allowed value.
             % Output:
             %   roiInd      An array where each row is a set of ROI indices for one input index
             %               ROIs causing edge issue are removed from the reuslt.
@@ -438,7 +461,7 @@ classdef MMath
             %   m           Mean values.
             %   sd          Standard deviations.
             %   se          Standard error of the mean.
-            %   ci          95% bootstrap confidence intervals.
+            %   ci          95% bootstrap confidence intervals of the mean.
             
             if isempty(A)
                 A = NaN;
@@ -532,6 +555,39 @@ classdef MMath
             [corrVal, pVal] = corr(x(~indNan), y(~indNan));
         end
         
+        function [r2, r2adj] = RSquared(X, y, b, c)
+            % Compute R-squared and adjusted R-squared
+            %
+            %   [r2, r2adj] = MMath.RSquared(X, y, b)
+            %   [r2, r2adj] = MMath.RSquared(X, y, b, c)
+            %
+            % Inputs
+            %   X       An array of samples where columns are predictors and rows are observations.
+            %   y       A vector of responses.
+            %   b       Regression coefficients.
+            %   c       Regression intercept.
+            % Output
+            %   r2      R-Squared (coefficient of determination).
+            %   r2adj   Adjusted R-Squared.
+            if nargin < 4
+                c = zeros(1,size(X,2));
+                p = size(b,1);
+            else
+                p = size(b,1) + 1;
+            end
+            if iscolumn(c)
+                c = c';
+            end
+            n = size(X,1);
+            yhat = X*b + c;
+            rhat = y - yhat;
+            rtotal = y - mean(y, 1, 'omitnan');
+            SSE = sum(rhat.^2, 1, 'omitnan'); % error sum of squares
+            TSS = sum(rtotal.^2, 1, 'omitnan'); % total sum of squares
+            r2 = 1 - SSE./TSS;
+            r2adj = 1 - (n-1)/(n-p) * SSE./TSS;
+        end
+        
         function y = SigMf(x, params)
             %SIGMF Sigmoid curve membership function.
             %   SIGMF(X, PARAMS) returns a matrix which is the sigmoid
@@ -572,6 +628,23 @@ classdef MMath
             y = 1./(1 + exp(-a*(x-c)));
         end
         
+        function B = SqueezeDims(A, dims)
+            % Squeeze only the specified dimensions
+            %
+            %   B = MMath.SqueezeDims(A, dims)
+            %
+            % Inputs
+            %   A       Numeric array.
+            %   dims    Dimensions to squeeze.
+            % Output
+            %   B       Resulting array.
+            
+            sz = size(A);
+            assert(all(sz(dims) == 1), 'Specified dimensions must all have size of 1');
+            dimKeep = setdiff(1:ndims(A), dims);
+            B = permute(A, [dimKeep dims]);
+        end
+        
         function [se, sd] = StandardError(A, dim)
             % Calculates the standard error of the population mean
             %
@@ -599,6 +672,65 @@ classdef MMath
             
             sd = nanstd(A, 0, dim);
             se = sd ./ sqrt(size(A,dim));
+        end
+        
+        function ve = VarExplained(X, B, varType)
+            % Percent variance along each basis out of total variance
+            % 
+            %   ve = MMath.VarExplained(X, B)
+            %   ve = MMath.VarExplained(X, B, 'ortho')
+            % 
+            % Inputs 
+            %   X           A matrix whose columns are variables and rows are observations.
+            %   B           A matrix of basis vectors in column.
+            %   'ortho'     See below.
+            % Output
+            %   ve          A vector of percent variance along each basis out of total variance.
+            %               When 'ortho' is not specified, ve are computed for original bases in B.
+            %               When specified, ve are computed for orthogonal bases that span B.
+            
+            X = rmmissing(X);
+            
+            if nargin > 2 && startsWith(varType, 'ortho')
+                [U, S] = svd(B);
+                B = U(:, diag(S) > 0);
+            else
+                L = sqrt(sum(B.^2));
+                L(L == 0) = eps;
+                B = B ./ L;
+            end
+            
+            varSub = var(X*B);
+            varTotal = trace(cov(X));
+            ve = varSub/varTotal*100;
+        end
+        
+        function C = VecCosine(A, B)
+            % Compute pairwise cosine of vectors
+            %
+            %   C = MMath.VecCosine(A)
+            %   C = MMath.VecCosine(A, B)
+            %
+            % Inputs
+            %   A,B     Matrices of column vectors. If only A is provided, the function computes
+            %           pairwise cosine among columns of A, otherwise between columns of A and B.
+            % Output
+            %   C       A matrix of pairwise cosine values. If A and B are both provided, rows 
+            %           correspond to vectors in A and columns correspond to vectors in B.
+            
+            L = sqrt(sum(A.^2));
+            L(L == 0) = eps;
+            A = A ./ L;
+            
+            if nargin < 2
+                B = A;
+            else
+                L = sqrt(sum(B.^2));
+                L(L == 0) = eps;
+                B = B ./ L;
+            end
+            
+            C = A'*B;
         end
     end
 end

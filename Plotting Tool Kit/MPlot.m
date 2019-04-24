@@ -96,7 +96,7 @@ classdef MPlot
             %   MPlot.ErrorShade(..., 'IsRelative', true)
             %   MPlot.ErrorShade(..., 'Orientation', 'vertical')
             %   MPlot.ErrorShade(..., 'Color', 'k')
-            %   MPlot.ErrorShade(..., 'Alpha', 0.3)
+            %   MPlot.ErrorShade(..., 'Alpha', 0.15)
             %
             % Inputs:
             %   x               X-coordinates. Default is indices of elements in y. 
@@ -119,7 +119,7 @@ classdef MPlot
             p.addOptional('arg4', []);
             p.addParameter('IsRelative', true, @islogical);
             p.addParameter('Color', 'k');
-            p.addParameter('Alpha', 0.3, @isnumeric);
+            p.addParameter('Alpha', 0.15, @isnumeric);
             p.addParameter('Orientation', 'vertical', @(x) any(strcmp(x, {'vertical', 'horizontal'})));
             
             p.parse(varargin{:});
