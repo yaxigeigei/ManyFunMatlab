@@ -2,6 +2,23 @@ classdef MPlot
     %MPlot A collection of functions useful for plotting
     
     methods(Static)
+        function varargout = Axes(varargin)
+            % Change Axes object with custom defaults
+            switch numel(varargin)
+                case 0
+                    ax = axes();
+                case 1
+                    ax = varargin{1};
+                case 3
+                    ax = subplot(varargin{:});
+            end
+            ax.Box = 'off';
+            ax.TickDir = 'out';
+            if nargout > 0
+                varargout{1} = ax;
+            end
+        end
+        
         function varargout = Blocks(xRange, yRange, color, varargin)
             % Plot rectangles based on X anf Y ranges
             % 
@@ -78,13 +95,27 @@ classdef MPlot
             daspect([1 1 1]);
         end
         
-        function cc = Color2Str(cc)
-            % Convert n-by-3 RGB color array to strings in the form '%f,%f,%f'
+        function cc = Color2Str(cc, txt)
+            % Convert color array to strings in the form '%f,%f,%f' or '\color[rgb]{%f,%f,%f}%s'
             % 
             %   cc = Color2Str(cc)
+            %   cc = Color2Str(cc, txt)
+            %
+            % Inputs
+            %   cc      n-by-3 RGB or n-by-4 RGBA color array.
+            %   txt     n strings to format.
+            % Output
+            %   cc      n formated strings. If txt is not provided, each output is formated as 
+            %           '%f,%f,%f' or '%f,%f,%f,%f', otherwise as '\color[rgb]{%f,%f,%f}%s' 
+            %           where %s is a string in txt.
             cc = mat2str(cc);
             cc = strrep(cc(2:end-1), ' ', ',');
             cc = strsplit(cc, ';')';
+            if nargin > 1
+                txt = cellstr(txt);
+                cc = cellfun(@(c,x) ['\color[rgb]{' c '}' x], ...
+                    cc, txt, 'Uni', false);
+            end
         end
         
         function ErrorShade(varargin)
@@ -171,6 +202,19 @@ classdef MPlot
             end
         end
         
+        function varargout = Figure(f)
+            % Make figure with white background
+            if nargin < 1
+                f = gcf;
+            else
+                f = figure(f);
+            end
+            f.Color = 'w';
+            if nargout > 0
+                varargout{1} = f;
+            end
+        end
+        
         function Paperize(varargin)
             % Make axes comply with conventions of publication
             %
@@ -184,8 +228,7 @@ classdef MPlot
             % Inputs:
             %   h           Array of Axes or Figure handle(s). Default is the current figure.
             %               If h is empty, all existing Axes will be operated on. 
-            %   fontSize    Font size. Default 6. 
-            %
+            %   fontSize    Font size. Default 6.
             
             p = inputParser();
             p.addOptional('h', gcf, @ishandle);

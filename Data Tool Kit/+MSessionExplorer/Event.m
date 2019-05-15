@@ -56,14 +56,16 @@ classdef Event
             val = this.T_;
         end
         
-        function SetTfield(this, fieldName, val)
+        function this = SetTfield(this, fieldName, val)
             % Assign value to a field in each T property of an object array
             % 
-            %   objs.SetTfield(fieldName, val)
+            %   objs = objs.SetTfield(fieldName, val)
             % 
             % Inputs
             %   fieldName       Name of the field to assign.
             %   val             Values to assign. The number of element must match that of the objects. 
+            % Output
+            %   objs            Modified objects
             assert(numel(this) == numel(val), 'Numbers of element do not match');
             if iscell(val)
                 for i = 1 : numel(this)
@@ -101,14 +103,16 @@ classdef Event
             end
         end
         
-        function SetVfield(this, fieldName, val)
+        function this = SetVfield(this, fieldName, val)
             % Assign value to a field in each V property of an object array
             % 
-            %   objs.SetTfield(fieldName, val)
+            %   objs = objs.SetTfield(fieldName, val)
             % 
             % Inputs
             %   fieldName       Name of the field to assign.
             %   val             Values to assign. The number of element must match that of the objects. 
+            % Output
+            %   objs            Modified objects
             assert(numel(this) == numel(val), 'Numbers of element do not match');
             if iscell(val)
                 for i = 1 : numel(this)

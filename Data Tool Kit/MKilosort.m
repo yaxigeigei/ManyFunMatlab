@@ -134,6 +134,7 @@ classdef MKilosort
             
             % Preprocess data and extract spikes for initialization
             ResetGPU();
+            figure;
             [rez, DATA, uproj] = preprocessData(ops);
             
             % Fit templates iteratively

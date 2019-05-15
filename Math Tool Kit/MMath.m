@@ -443,7 +443,7 @@ classdef MMath
             boundariesInd = [ find(dVect == 1), find(dVect == -1) - 1 ];
         end
         
-        function [m, sd, se, ci] = MeanStats(A, dim, varargin)
+        function varargout = MeanStats(A, dim, varargin)
             % Compute means, SDs, SEMs and bootstrap CIs from samples
             %
             %   [m, sd, se, ci] = MMath.MeanStats(A)
@@ -476,24 +476,30 @@ classdef MMath
             end
             
             if numel(varargin) > 0
-                A(isoutlier(A, varargin{:}, dim)) = [];
+                A(isoutlier(A, varargin{:}, dim)) = NaN;
             end
             
             m = nanmean(A, dim);
             sd = nanstd(A, 0, dim);
             se = sd ./ sqrt(size(A,dim));
+            varargout{1} = m;
+            varargout{2} = sd;
+            varargout{3} = se;
             
-            if size(A,dim) < 2
-                ci = cat(dim, m, m);
-            else
-                % bootci can only sample along the first dimension, thus permuting A
-                dimOrder = [dim setdiff(1:ndims(A), dim)];
-                A = permute(A, dimOrder);
-                ci = bootci(1000, @nanmean, A);
-                
-                % Restore original dimension order
-                ci = permute(ci, [1 3:ndims(ci) 2]); % squeeze out the second (mean value) dimension
-                ci = ipermute(ci, dimOrder);
+            if nargout > 3
+                if size(A,dim) < 2
+                    ci = cat(dim, m, m);
+                else
+                    % bootci can only sample along the first dimension, thus permuting A
+                    dimOrder = [dim setdiff(1:ndims(A), dim)];
+                    A = permute(A, dimOrder);
+                    ci = bootci(1000, @nanmean, A);
+                    
+                    % Restore original dimension order
+                    ci = permute(ci, [1 3:ndims(ci) 2]); % squeeze out the second (mean value) dimension
+                    ci = ipermute(ci, dimOrder);
+                end
+                varargout{4} = ci;
             end
         end
         
@@ -546,15 +552,6 @@ classdef MMath
             I = nansum(I(:));
         end
         
-        function [corrVal, pVal] = NanCorr(x, y)
-            % Similar to MATLAB built-in function corr but ignores NaN values
-            
-            x = x(:);
-            y = y(:);
-            indNan = isnan(x) | isnan(y);
-            [corrVal, pVal] = corr(x(~indNan), y(~indNan));
-        end
-        
         function [r2, r2adj] = RSquared(X, y, b, c)
             % Compute R-squared and adjusted R-squared
             %
@@ -586,46 +583,6 @@ classdef MMath
             TSS = sum(rtotal.^2, 1, 'omitnan'); % total sum of squares
             r2 = 1 - SSE./TSS;
             r2adj = 1 - (n-1)/(n-p) * SSE./TSS;
-        end
-        
-        function y = SigMf(x, params)
-            %SIGMF Sigmoid curve membership function.
-            %   SIGMF(X, PARAMS) returns a matrix which is the sigmoid
-            %   membership function evaluated at X. PARAMS is a 2-element vector
-            %   that determines the shape and position of this membership function.
-            %   Specifically, the formula for this membership function is:
-            %
-            %   SIGMF(X, [A, C]) = 1./(1 + EXP(-A*(X-C)))
-            %
-            %   For example:
-            %
-            %       x = (0:0.2:10)';
-            %       y1 = sigmf(x, [-1 5]);
-            %       y2 = sigmf(x, [-3 5]);
-            %       y3 = sigmf(x, [4 5]);
-            %       y4 = sigmf(x, [8 5]);
-            %       subplot(211); plot(x, [y1 y2 y3 y4]);
-            %       y1 = sigmf(x, [5 2]);
-            %       y2 = sigmf(x, [5 4]);
-            %       y3 = sigmf(x, [5 6]);
-            %       y4 = sigmf(x, [5 8]);
-            %       subplot(212); plot(x, [y1 y2 y3 y4]);
-            %       set(gcf, 'name', 'sigmf', 'numbertitle', 'off');
-            %
-            %   See also DSIGMF, EVALMF, GAUSS2MF, GAUSSMF, GBELLMF, MF2MF, PIMF, PSIGMF, SMF,
-            %   TRAPMF, TRIMF, ZMF.
-            
-            %       Roger Jang, 6-29-93, 4-17-93.
-            %   Copyright 1994-2002 The MathWorks, Inc.
-            
-            if nargin ~= 2
-                error('Two arguments are required by the sigmoidal MF.');
-            elseif length(params) < 2
-                error('The sigmoidal MF needs at least two parameters.');
-            end
-            
-            a = params(1); c = params(2);
-            y = 1./(1 + exp(-a*(x-c)));
         end
         
         function B = SqueezeDims(A, dims)
@@ -674,35 +631,52 @@ classdef MMath
             se = sd ./ sqrt(size(A,dim));
         end
         
-        function ve = VarExplained(X, B, varType)
-            % Percent variance along each basis out of total variance
+        function VE = VarExplained(X, B, varType)
+            % Percent variance explained (VE)
             % 
-            %   ve = MMath.VarExplained(X, B)
-            %   ve = MMath.VarExplained(X, B, 'ortho')
+            %   VE = MMath.VarExplained(X, B)
+            %   VE = MMath.VarExplained(X, B, varType)
             % 
             % Inputs 
             %   X           A matrix whose columns are variables and rows are observations.
             %   B           A matrix of basis vectors in column.
-            %   'ortho'     See below.
+            %   varType     'each'(default): compute VE by each basis in B independently.
+            %               'span': compute VE by a set of orthonormal bases that span B.
+            %               'unique': compute variance uniquely explained by each basis in B.
             % Output
-            %   ve          A vector of percent variance along each basis out of total variance.
-            %               When 'ortho' is not specified, ve are computed for original bases in B.
-            %               When specified, ve are computed for orthogonal bases that span B.
+            %   VE          A vector of percent variance explained.
+            
+            if nargin < 3 || size(B,2) == 1
+                varType = 'each';
+            end
+            assert(ismember(varType, {'each', 'span', 'unique'}));
             
             X = rmmissing(X);
             
-            if nargin > 2 && startsWith(varType, 'ortho')
-                [U, S] = svd(B);
-                B = U(:, diag(S) > 0);
-            else
-                L = sqrt(sum(B.^2));
-                L(L == 0) = eps;
-                B = B ./ L;
+            % Normalize bases
+            L = sqrt(sum(B.^2));
+            L(L == 0) = eps;
+            B = B ./ L;
+            
+            if ~strcmp(varType, 'each')
+                % Find orthonormal bases
+                [Q, R] = qr(B);
+                if ismatrix(R)
+                    r = diag(R);
+                else
+                    r = R(1);
+                end
+                B = Q(:, 1:length(r));
+                if strcmp(varType, 'unique')
+                    % Scale bases
+                    B = B.*r';
+                end
             end
             
+            % Compute variances
             varSub = var(X*B);
             varTotal = trace(cov(X));
-            ve = varSub/varTotal*100;
+            VE = varSub/varTotal*100;
         end
         
         function C = VecCosine(A, B)
