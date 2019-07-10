@@ -421,26 +421,26 @@ classdef MMath
             H  =  (alpha >= pValue);
         end
         
-        function boundariesInd = Logical2Bounds(vect)
+        function boundaryInd = Logical2Bounds(vect)
             %Converts logical(boolean/binary) vector to tuples indicating the bondaries of 1 regions
             %e.g. [ 0 0 0 1 1 1 0 0 1 ] => bondaries [ 4 6; 9 9 ]
             %
-            %   bondariesInd = MMath.Logical2Bounds(vect)
+            %   boundaryInd = MMath.Logical2Bounds(vect)
             %
             % Inputs:
             %   vect            A logical(boolean/binary) vector
             % Output:
-            %   bondariesInd    Tuples (each row) indicating the bondaries of 1 regions
+            %   boundaryInd     Tuples (each row) indicating the bondaries of 1 regions
             
             if isempty(vect)
-                boundariesInd = zeros(0,2);
+                boundaryInd = zeros(0,2);
                 return;
             end
             
             vect = logical(vect(:));
             vect = [ zeros(1,size(vect,2)); vect; zeros(1,size(vect,2)) ];
             dVect = diff(vect);
-            boundariesInd = [ find(dVect == 1), find(dVect == -1) - 1 ];
+            boundaryInd = [ find(dVect == 1), find(dVect == -1) - 1 ];
         end
         
         function varargout = MeanStats(A, dim, varargin)
@@ -448,35 +448,58 @@ classdef MMath
             %
             %   [m, sd, se, ci] = MMath.MeanStats(A)
             %   [m, sd, se, ci] = MMath.MeanStats(A, dim)
-            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, isoutlierArg, ...)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., isoutlierArgs, ...)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'NBoot', 1000)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'Alpha', 0.05)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'Options', statset)
             %
             % Inputs
-            %   A           Numeric array of samples.
-            %   dim         Dimension to operate along.
-            %   isoutlierArg, ...
-            %               One or more arguments for isoutlier function to remove outliers in A.
+            %   A                   Numeric array of samples.
+            %   dim                 Dimension to operate along.
+            %   'isoutlierArgs'     A cell array for one or more arguments of the isoutlier 
+            %                       function to remove outliers in A.
+            %   'NBoot'             The number of bootstrap sampling.
+            %   'Alpha'             Significance level. Default is 0.05.
             % Outputs
             %   All otuputs has the same dimensionality as A with statistical values in the dim 
             %   dimension. 
-            %   m           Mean values.
-            %   sd          Standard deviations.
-            %   se          Standard error of the mean.
-            %   ci          95% bootstrap confidence intervals of the mean.
+            %   m                   Mean values.
+            %   sd                  Standard deviations.
+            %   se                  Standard error of the mean.
+            %   ci                  95% bootstrap confidence intervals of the mean.
             
-            if isempty(A)
-                A = NaN;
-            end
+            p = inputParser;
+            p.addParameter('IsOutlierArgs', {});
+            p.addParameter('NBoot', 1000);
+            p.addParameter('Alpha', 0.05);
+            p.addParameter('Options', statset);
+            p.parse(varargin{:});
+            isoutlierArgs = p.Results.IsOutlierArgs;
+            nboot = p.Results.NBoot;
+            alphaVal = p.Results.Alpha;
+            ops = p.Results.Options;
             
             if nargin < 2
-                if isscalar(A)
+                % Default using the first non-singleton dimension
+                if numel(A) < 2
                     dim = 1;
                 else
                     dim = find(size(A) > 1, 1);
                 end
             end
             
-            if numel(varargin) > 0
-                A(isoutlier(A, varargin{:}, dim)) = NaN;
+            if isempty(A)
+                % Create NaN array with matching size
+                sz = size(A);
+                sz(sz==0) = 1;
+                A = NaN(sz);
+            end
+            
+            if ~iscell(isoutlierArgs)
+                isoutlierArgs = {isoutlierArgs};
+            end
+            if numel(isoutlierArgs) > 0
+                A(isoutlier(A, isoutlierArgs{:}, dim)) = NaN;
             end
             
             m = nanmean(A, dim);
@@ -493,7 +516,7 @@ classdef MMath
                     % bootci can only sample along the first dimension, thus permuting A
                     dimOrder = [dim setdiff(1:ndims(A), dim)];
                     A = permute(A, dimOrder);
-                    ci = bootci(1000, @nanmean, A);
+                    ci = bootci(nboot, {@nanmean, A}, 'alpha', alphaVal, 'Options', ops);
                     
                     % Restore original dimension order
                     ci = permute(ci, [1 3:ndims(ci) 2]); % squeeze out the second (mean value) dimension
@@ -629,6 +652,44 @@ classdef MMath
             
             sd = nanstd(A, 0, dim);
             se = sd ./ sqrt(size(A,dim));
+        end
+        
+        function ranges = ValueBounds(vect, varargin)
+            % Find boundary indices of the same values in a vector
+            %
+            %   boundaryInd = MMath.ValueBounds(vect)
+            %   boundaryInd = MMath.ValueBounds(vect, categories)
+            %   boundaryInd = MMath.ValueBounds(vect, ..., 'UniformOutput', true)
+            %
+            % Inputs
+            %   vect            A vector.
+            %   categories      A set of values about which to return boundary indices. Useful when 
+            %                   one needs to return boundaries for a subset or a superset of values 
+            %                   present in vect. The default is the unique values in vect. 
+            %   'UniformOutput' Whether to combine boundary indices of each category into a 
+            %                   matrix or to store them in a cell array. Default true, to combine.
+            % Output
+            %   boundaryInd     Tuples (each row) indicating the bondaries of 1 regions
+            
+            p = inputParser;
+            p.addOptional('categories', []);
+            p.addParameter('UniformOutput', true, @islogical);
+            p.parse(varargin{:});
+            cats = p.Results.categories;
+            isUni = p.Results.UniformOutput;
+            
+            if isempty(cats)
+                cats = unique(vect);
+            end
+            ranges = cell(numel(cats),1);
+            for k = 1 : numel(cats)
+                ranges{k} = MMath.Logical2Bounds(vect == cats(k));
+            end
+            if isUni
+                assert(all(cellfun(@(x) size(x,1)==1, ranges)), ...
+                    'For ''UniformOutput'' set to true, every category must produce one pair of bounds');
+                ranges = cell2mat(ranges);
+            end
         end
         
         function VE = VarExplained(X, B, varType)
