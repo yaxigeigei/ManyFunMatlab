@@ -150,6 +150,12 @@ classdef MSessionExplorer < handle
             % Output
             %   se                  The new MSessionExplorer object
             
+            if numel(this) > 1
+                % Duplicate se array recursively
+                se = arrayfun(@(x) x.Duplicate(varargin{:}), this);
+                return
+            end
+            
             % Handle user input
             p = inputParser();
             p.addOptional('tbNames', []);
@@ -333,9 +339,14 @@ classdef MSessionExplorer < handle
             %   RemoveTable(tbName1, tbName2, tbName3, ...)
             %
             % Input
-            %   tbNameN         A string or cell array of strings indicating the name of table(s) to remove.
+            %   tbNameN         A string indicating the name of a table to remove.
             
-            this.IValidateTableNames(varargin, true);
+            notTb = setdiff(varargin, this.tableNames);
+            if this.isVerbose
+                warning backtrace off
+                cellfun(@(x) warning('There is no table named %s', x), notTb);
+            end
+            varargin = intersect(varargin, this.tableNames);
             this.tot(varargin,:) = [];
             if isempty(this.tot)
                 this.epochInd = [];
