@@ -202,6 +202,135 @@ classdef MPlot
             end
         end
         
+        function varargout = GroupRibbon(xRange, yRange, varargin)
+            % Plot a segmented ribbon to label groups
+            % 
+            %   MPlot.GroupRibbon(xRange, yRange)
+            %   MPlot.GroupRibbon(xRange, yRange, colors)
+            %   MPlot.GroupRibbon(xRange, yRange, ..., 'Groups', [])
+            %   MPlot.GroupRibbon(xRange, yRange, ..., 'Style', 'patch')
+            %   MPlot.GroupRibbon(xRange, yRange, ..., 'PlotArgs', {})
+            %   [xCenter, yCenter] = MPlot.GroupRibbon(xRange, yRange, ...)
+            % 
+            % Inputs
+            %   xRange          If the robbon goes along the y-axis, xRange is a 2-element numeric vector 
+            %                   indicating where the width of the ribbon begins and ends. 
+            %                   If the ribbon goes along the x-axis, xRange is
+            %                   1) A vector with discrete values (i.e. input to MMath.ValueBonds function).
+            %                   2) Edges of segments in an n-by-2 matrix where n is the number of segments.
+            %                   3) An n-element cell array where each element is a m-by-2 matrix of segment 
+            %                      edges. All segments in one matrix will be plotted using the same color.
+            %   yRange          Same as xRange but for the other axis.
+            %   colors          1) An n-by-3 or n-by-4 matrix of RGB or RGBA colors for the n groups.
+            %                   2) A function handle of colormap. Defualt is the MATLAB lines function.
+            %   'Groups'        If xRange or yRange is the 1) type. 'Groups' is useful to specify a subset 
+            %                   or a superset of group values of interest. The default is the unique values 
+            %                   present in the original vector. 
+            %   'IndVal'        
+            %   'Style'         Style of the ribbon, 'patch' or 'line'.
+            %   'PlotArgs'      Arguments in a cell array for MATLAB patch or line function, depending on 
+            %                   the choice of 'Style'.
+            % Outputs
+            %   xCenters, yCenters      Center coordinates of segments in cell array where each element 
+            %                           corresponds to one group.
+            
+            % Parse user inputs
+            p = inputParser;
+            p.addOptional('Colors', [], @(x) isnumeric(x) || isa(x, 'function_handle'));
+            p.addParameter('Groups', []);
+            p.addParameter('IndVal', []);
+            p.addParameter('Style', 'patch', @(x) ismember(lower(x), {'line', 'patch'}));
+            p.addParameter('PlotArgs', {}, @iscell);
+            p.parse(varargin{:});
+            colors = p.Results.Colors;
+            style = p.Results.Style;
+            groups = p.Results.Groups;
+            indVal = p.Results.IndVal;
+            plotArgs = p.Results.PlotArgs;
+            
+            % Standardize ranges
+            if isnumeric(xRange) && numel(xRange) == 2
+                isVertical = true;
+                yRange = findRange(yRange, groups, indVal);
+                xRange = repmat({xRange(:)'}, size(yRange));
+                [yCenters, xCenters] = findCenter(yRange, xRange);
+            elseif isnumeric(yRange) && numel(yRange) == 2
+                isVertical = false;
+                xRange = findRange(xRange, groups, indVal);
+                yRange = repmat({yRange(:)'}, size(xRange));
+                [xCenters, yCenters] = findCenter(xRange, yRange);
+            else
+                error('Either xRange or yRange must be a 2-element numeric vector specifying the width of the ribbon');
+            end
+            
+            function r = findRange(r, g, iv)
+                if isvector(r)
+                    % Find ranges indices from a vector of discrete values
+                    r = MMath.ValueBounds(r, g, 'Uni', false);
+                    for k = 1 : numel(r)
+                        r{k} = r{k} + [-.5 .5];
+                    end
+                elseif ~iscell(r)
+                    % Treat each row of range as a group
+                    r = num2cell(r,2);
+                end
+                if ~isempty(iv)
+                    % Convert indices to axis values
+                    iv = iv(:);
+                    ind = (1:numel(iv))';
+                    for k = 1 : numel(r)
+                        r{k} = interp1(ind, iv, r{k}, 'linear', 'extrap');
+                    end
+                end
+            end
+            
+            function [cSeg, cWidth] = findCenter(rSeg, rWidth)
+                cSeg = cell(size(rSeg));
+                cWidth = cell(size(rWidth));
+                for k = 1 : numel(rSeg)
+                    cSeg{k} = mean(rSeg{k}, 2);
+                    cWidth{k} = repmat(mean(rWidth{k}), size(cSeg{k}));
+                end
+                if all(cellfun(@isscalar, cSeg))
+                    cSeg = cell2mat(cSeg);
+                    cWidth = cell2mat(cWidth);
+                end
+            end
+            
+            % Specify colors
+            if isempty(colors)
+                colors = lines(numel(xRange));
+            elseif isa(colors, 'function_handle')
+                colors = colors(numel(xRange));
+            end
+            
+            % Plot the ribbon
+            hold on
+            for i = 1 : numel(xRange)
+                if strcmpi(style, 'patch')
+                    MPlot.Blocks(xRange{i}, yRange{i}, colors(i,:), plotArgs{:});
+                elseif isVertical
+                    w = diff(xRange{i});
+                    y = [yRange{i} NaN(size(yRange{i},1),1)];
+                    x = repmat(mean(xRange{i}), size(y));
+                    line(x, y, 'Color', colors(i,:), 'LineWidth', w, plotArgs{:});
+                else
+                    w = diff(yRange{i});
+                    x = [xRange{i} NaN(size(xRange{i},1),1)];
+                    y = repmat(mean(yRange{i}), size(x));
+                    line(x, y, 'Color', colors(i,:), 'LineWidth', w, plotArgs{:});
+                end
+            end
+            
+            % Output segment centers
+            if nargout > 0
+                varargout{1} = xCenters;
+            end
+            if nargout > 1
+                varargout{2} = yCenters;
+            end
+        end
+        
         function varargout = Figure(f)
             % Make figure with white background
             if nargin < 1
@@ -223,6 +352,7 @@ classdef MPlot
             %   MPlot.Paperize(..., 'ColumnsWide', [])
             %   MPlot.Paperize(..., 'ColumnsHigh', [])
             %   MPlot.Paperize(..., 'AspectRatio', [])
+            %   MPlot.Paperize(..., 'Zoom', 2)
             %   MPlot.Paperize(..., 'JournalStyle', 'Cell')
             %
             % Inputs:
@@ -233,6 +363,7 @@ classdef MPlot
             p = inputParser();
             p.addOptional('h', gcf, @ishandle);
             p.addParameter('FontSize', 6, @isscalar);
+            p.addParameter('Zoom', 2, @isscalar);
             p.addParameter('ColumnsWide', [], @isscalar);
             p.addParameter('ColumnsHigh', [], @isscalar);
             p.addParameter('AspectRatio', [], @isscalar);
@@ -241,6 +372,7 @@ classdef MPlot
             p.parse(varargin{:});
             h = p.Results.h;
             fontSize = p.Results.FontSize;
+            z = p.Results.Zoom;
             colsWide = p.Results.ColumnsWide;
             colsHigh = p.Results.ColumnsHigh;
             aRatio = p.Results.AspectRatio;
@@ -276,21 +408,25 @@ classdef MPlot
                     if ~isempty(colsWide)
                         h(i).Color = 'w';
                         h(i).Units = 'centimeter';
-                        h(i).Position(3) = figWidth;
+                        h(i).Position(3) = figWidth * z;
                         if ~isempty(colsHigh)
-                            h(i).Position(4) = figWidth / colsWide * colsHigh;
+                            h(i).Position(4) = figWidth / colsWide * colsHigh * z;
                         elseif ~isempty(aRatio)
-                            h(i).Position(4) = figWidth * aRatio;
+                            h(i).Position(4) = figWidth * aRatio * z;
                         end
                     end
-%                     tightfig(h(i));
                     ax = findobj(h, 'Type', 'Axes');
                 else
                     ax = h(i);
                 end
                 
                 for j = 1 : numel(ax)
-                    set(ax(j), 'TickDir', 'out', 'FontSize', fontSize, 'FontName', 'arial');
+                    set(ax(j), ...
+                        'TickDir', 'out', ...
+                        'FontName', 'arial', ...
+                        'FontSize', fontSize*z, ...
+                        'LabelFontSizeMultiplier', 1, ...
+                        'TitleFontSizeMultiplier', 1);
                 end
             end
         end
@@ -594,53 +730,87 @@ classdef MPlot
             %   MPlot.Violin(..., 'Alpha', 0.3)
             %   MPlot.Violin(..., 'Orientation', 'vertical')
             %   MPlot.Violin(..., 'Alignment', 'center')
+            %   MPlot.Violin(..., 'Percentiles', [])
+            %   MPlot.Violin(..., 'LineArgs', {'Color', 'r'})
             %   h = MPlot.Violin(...)
             %
             % Inputs:
             %   pos             An n-element vector indicating the position of n violin plots. 
-            %   bb              An array where each column contains bin centers of one violin plot.
-            %   nn              An array where each column contains widths of one violin plot.
+            %   bb              A matrix where each column contains bin centers or edges of a violin.
+            %   nn              A matrix where each column contains widths of a violin.
             %   'Color'         Face color of the violin plots. Default is black.
             %   'Alpha'         Transparancy of the shade. Default 0.3.
             %   'Orientation'   Orientation of violins. Default is 'vertical'.
-            %   'Alignment'     The side of violins aligned to straight line. Default is 'center'.
+            %   'Alignment'     The side of violins aligned to straight line. Options include 'low', 
+            %                   'high' and 'center' (default).
             % Output: 
             %   hh              Handles of Patch object
             
             % Handles user inputs
             p = inputParser();
-            p.addParameter('Quantiles', [], @isnumeric);
             p.addParameter('Color', 'k');
             p.addParameter('Alpha', 1, @isnumeric);
             p.addParameter('Orientation', 'vertical', @(x) ismember(x, {'vertical', 'horizontal'}));
             p.addParameter('Alignment', 'center', @(x) ismember(x, {'low', 'high', 'center'}));
+            p.addParameter('Percentiles', [], @isnumeric);
+            p.addParameter('LineArgs', {'Color', 'r'}, @iscell);
             
             p.parse(varargin{:});
-            qt = p.Results.Quantiles;
             color = p.Results.Color;
             faceAlpha = p.Results.Alpha;
             ori = p.Results.Orientation;
             alignType = p.Results.Alignment;
+            prct = p.Results.Percentiles;
+            lineArgs = p.Results.LineArgs;
+            
+            if size(bb,1) == size(nn,1)+1
+                % Convert bin edges to bin centers
+                bb = bb(1:end-1,:) + diff(bb,1,1);
+            end
+            
+            if ~isempty(prct)
+                % Compute histogram height at percentiles
+                nnEps = nn;
+                nnEps(~nnEps) = eps; % add eps for monotonic CDFs
+                nnCDF = cumsum(nnEps);
+                nnCDF = nnCDF ./ nnCDF(end,:);
+                bbPrct = zeros(numel(prct), size(bb,2));
+                nnPrct = bbPrct;
+                for i = 1 : size(bb,2)
+                    bbPrct(:,i) = interp1(nnCDF(:,i), bb(:,i), prct/100);
+                    nnPrct(:,i) = interp1(bb(:,i), nn(:,i), bbPrct(:,i));
+                end
+            else
+                bbPrct = NaN(1, size(bb,2));
+                nnPrct = bbPrct;
+            end
             
             % Ploting
             hold on;
             for k = size(nn,2) : -1 : 1
                 b = [bb(:,k); flip(bb(:,k))];
                 n = nn(:,k);
+                bPrct = bbPrct(:,[k k]);
+                nPrct = nnPrct(:,k);
                 
                 switch alignType
                     case 'center'
                         n = pos(k) + [-n/2; flip(n/2)];
+                        nPrct = pos(k) + [-nPrct nPrct]/2;
                     case 'low'
-                        n = pos(k) + [zeros(size(n)); flip(n)] - nanmax(n)/2;
+                        n = pos(k) + [zeros(size(n)); flip(n)];
+                        nPrct = pos(k) + [zeros(size(nPrct)) nPrct];
                     case 'high'
-                        n = pos(k) + [-n; zeros(size(n))] + nanmax(n)/2;
+                        n = pos(k) + [-n; zeros(size(n))];
+                        nPrct = pos(k) + [-nPrct zeros(size(nPrct))];
                 end
                 
                 if strcmp(ori, 'vertical')
                     h(k) = patch(n, b, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                    plot(nPrct', bPrct', lineArgs{:});
                 else
                     h(k) = patch(b, n, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                    plot(bPrct', nPrct', lineArgs{:});
                 end
             end
             
