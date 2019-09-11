@@ -15,11 +15,11 @@ function saveFigurePDF(figHandle, savename, flag, res)
 % Robert Wilson
 % 18-Mar-2010
 
-if exist('flag') ~= 1
+if ~exist('flag', 'var')
     flag = 0;
 end
 
-if exist('res') ~= 1
+if ~exist('res', 'var')
     res = 300;
 end
 
@@ -32,7 +32,7 @@ hp = pp(4);
 set(figHandle, 'papersize', [wp hp])
 
 if flag
-    print(figHandle, '-dpdf', ['-r' num2str(res)], '-zbuffer', savename);
+    print('-painters', figHandle, '-dpdf', ['-r' num2str(res)], '-zbuffer', savename);
 else
-    print(figHandle, '-dpdf', savename);
+    print('-painters', figHandle, '-dpdf', savename);
 end

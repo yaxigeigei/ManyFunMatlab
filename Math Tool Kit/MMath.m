@@ -448,7 +448,7 @@ classdef MMath
             %
             %   [m, sd, se, ci] = MMath.MeanStats(A)
             %   [m, sd, se, ci] = MMath.MeanStats(A, dim)
-            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., isoutlierArgs, ...)
+            %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'IsOutlierArgs', {})
             %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'NBoot', 1000)
             %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'Alpha', 0.05)
             %   [m, sd, se, ci] = MMath.MeanStats(A, dim, ..., 'Options', statset)

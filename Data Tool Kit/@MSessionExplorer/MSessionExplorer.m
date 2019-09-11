@@ -200,6 +200,7 @@ classdef MSessionExplorer < handle
                 varargin{i} = varargin{i}(:);
             end
             seArray = [this; cat(1, varargin{:})];
+            this = seArray(1); % handle the case where the input "this" is a vector
             
             % Output SE
             se = MSessionExplorer();

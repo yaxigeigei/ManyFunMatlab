@@ -41,7 +41,7 @@ classdef MUtil
             hit = any(hit);
         end
         
-        function xlsTb = ReadXls(xlsPath, sheetId)
+        function xlsTb = ReadXls(xlsPath, sheetId, varargin)
             % General-purposed function to read a spreadsheet from Excel file
             % 
             %   xlsTb = Tongue.Util.ReadXls(xlsPath, sheetId)
@@ -74,7 +74,7 @@ classdef MUtil
             end
             
             % Load spreadsheet
-            xlsTb = readtable(xlsPath, 'Sheet', sheetId);
+            xlsTb = readtable(xlsPath, 'Sheet', sheetId, varargin{:});
         end
         
     end

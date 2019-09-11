@@ -727,11 +727,12 @@ classdef MPlot
             % 
             %   MPlot.Violin(pos, bb, nn)
             %   MPlot.Violin(..., 'Color', 'k')
+            %   MPlot.Violin(..., 'Style', 'patch')
             %   MPlot.Violin(..., 'Alpha', 0.3)
             %   MPlot.Violin(..., 'Orientation', 'vertical')
             %   MPlot.Violin(..., 'Alignment', 'center')
             %   MPlot.Violin(..., 'Percentiles', [])
-            %   MPlot.Violin(..., 'LineArgs', {'Color', 'r'})
+            %   MPlot.Violin(..., 'PrctLineArgs', {'Color', 'r'})
             %   h = MPlot.Violin(...)
             %
             % Inputs:
@@ -739,29 +740,34 @@ classdef MPlot
             %   bb              A matrix where each column contains bin centers or edges of a violin.
             %   nn              A matrix where each column contains widths of a violin.
             %   'Color'         Face color of the violin plots. Default is black.
+            %   'Style'         'patch' (default) or 'contour'.
             %   'Alpha'         Transparancy of the shade. Default 0.3.
             %   'Orientation'   Orientation of violins. Default is 'vertical'.
             %   'Alignment'     The side of violins aligned to straight line. Options include 'low', 
             %                   'high' and 'center' (default).
+            %   'Percentiles'   Mark percentiles by providing a vector of percentages.
+            %   'PrctLineArgs'  A cell array of addtional arguments for plotting percentiles.
             % Output: 
             %   hh              Handles of Patch object
             
             % Handles user inputs
             p = inputParser();
             p.addParameter('Color', 'k');
+            p.addParameter('Style', 'patch', @(x) ismember(x, {'patch', 'contour'}));
             p.addParameter('Alpha', 1, @isnumeric);
             p.addParameter('Orientation', 'vertical', @(x) ismember(x, {'vertical', 'horizontal'}));
             p.addParameter('Alignment', 'center', @(x) ismember(x, {'low', 'high', 'center'}));
             p.addParameter('Percentiles', [], @isnumeric);
-            p.addParameter('LineArgs', {'Color', 'r'}, @iscell);
+            p.addParameter('PrctLineArgs', {'Color', 'r'}, @iscell);
             
             p.parse(varargin{:});
             color = p.Results.Color;
+            style = p.Results.Style;
             faceAlpha = p.Results.Alpha;
             ori = p.Results.Orientation;
             alignType = p.Results.Alignment;
             prct = p.Results.Percentiles;
-            lineArgs = p.Results.LineArgs;
+            prctArgs = p.Results.PrctLineArgs;
             
             if size(bb,1) == size(nn,1)+1
                 % Convert bin edges to bin centers
@@ -771,7 +777,7 @@ classdef MPlot
             if ~isempty(prct)
                 % Compute histogram height at percentiles
                 nnEps = nn;
-                nnEps(~nnEps) = eps; % add eps for monotonic CDFs
+                nnEps(~nnEps) = 10*eps; % add eps for monotonic CDFs
                 nnCDF = cumsum(nnEps);
                 nnCDF = nnCDF ./ nnCDF(end,:);
                 bbPrct = zeros(numel(prct), size(bb,2));
@@ -785,14 +791,20 @@ classdef MPlot
                 nnPrct = bbPrct;
             end
             
-            % Ploting
             hold on;
             for k = size(nn,2) : -1 : 1
-                b = [bb(:,k); flip(bb(:,k))];
+                b = bb(:,k);
                 n = nn(:,k);
+                
+                % Trim zeros at the ends (necessary for 'contour' style)
+                isTrim = cumsum(n, 'omitnan') == 0 | cumsum(n, 'omitnan', 'reverse') == 0;
+                b(isTrim) = [];
+                n(isTrim) = [];
+                
+                % Close the loop
+                b = [b; flip(b)];
                 bPrct = bbPrct(:,[k k]);
                 nPrct = nnPrct(:,k);
-                
                 switch alignType
                     case 'center'
                         n = pos(k) + [-n/2; flip(n/2)];
@@ -805,12 +817,20 @@ classdef MPlot
                         nPrct = pos(k) + [-nPrct zeros(size(nPrct))];
                 end
                 
-                if strcmp(ori, 'vertical')
-                    h(k) = patch(n, b, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
-                    plot(nPrct', bPrct', lineArgs{:});
+                % Choose style
+                if strcmp(style, 'patch')
+                    violin = @(x,y) patch(x, y, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
                 else
-                    h(k) = patch(b, n, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
-                    plot(bPrct', nPrct', lineArgs{:});
+                    violin = @(x,y) line(x, y, 'Color', color);
+                end
+                
+                % Plot a violin
+                if strcmp(ori, 'vertical')
+                    h(k) = violin(n, b);
+                    line(nPrct', bPrct', prctArgs{:});
+                else
+                    h(k) = violin(b, n);
+                    line(bPrct', nPrct', prctArgs{:});
                 end
             end
             

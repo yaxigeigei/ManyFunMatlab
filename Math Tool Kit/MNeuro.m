@@ -289,15 +289,17 @@ classdef MNeuro
             end
         end
         
-        function [mm, ee, stats] = MeanEventRate(T, edges)
+        function [mm, ee, stats] = MeanEventRate(T, edges, ciArgs)
             % Compute mean event rates and related stats from event times across repetitions
             %
-            %   [mm, ee, stats] = MNeuro.MeanEventRate(T, edges)
+            %   [mm, se, stats] = MNeuro.MeanEventRate(T, edges)
+            %   [mm, ci, stats] = MNeuro.MeanEventRate(T, edges, ciArgs)
             %
             % Inputs
             %   T               A cell array or a table of event time vectors. Rows are repeats 
             %                   (e.g. trials); columns are different types of event (e.g. units). 
             %   edges           Edges of time bins in a numeric vector. 
+            %   ciArgs          
             % Outputs
             %   mm              An array of mean event rates. Rows are time bins and columns are 
             %                   different types of event. 
@@ -325,10 +327,13 @@ classdef MNeuro
                 hh = cell2mat(hh);
                 
                 % Compute mean and sem of event rate
-                m = mean(hh);
-                e = MMath.StandardError(hh);
-                mm(:,i) = m;
-                ee(:,i) = e;
+                if exist('ciArgs', 'var')
+                    [m, ~, ~, e] = MMath.MeanStats(hh, ciArgs{:});
+                else
+                    [m, ~, e] = MMath.MeanStats(hh);
+                end
+                mm(:,i) = m';
+                ee(:,i,:) = e';
                 
                 % Compute other stats
                 [pkRate(i), pkBin(i)] = max(m);
@@ -341,11 +346,11 @@ classdef MNeuro
             stats.pkIdx = pkBin';
             stats.pkVal = pkRate';
             stats.pkProb = pkProb';
-            stats.AUC = sum(mm)';
+            stats.AUC = sum(mm,1)';
             stats.entropy = I';
         end
         
-        function [mm, ee, stats] = MeanTimeSeries(S)
+        function [mm, ee, stats] = MeanTimeSeries(S, ciArgs)
             % Compute mean and related stats of multiple time series across repetitions
             %
             %   [mm, ee, stats] = MNeuro.MeanTimeSeries(S)
@@ -384,10 +389,13 @@ classdef MNeuro
                 s = cell2mat(S(:,i));
                 
                 % Compute mean and sem
-                m = mean(s);
-                e = MMath.StandardError(s);
-                mm(:,i) = m;
-                ee(:,i) = e;
+                if exist('ciArgs', 'var')
+                    [m, ~, ~, e] = MMath.MeanStats(s, ciArgs{:});
+                else
+                    [m, ~, e] = MMath.MeanStats(s);
+                end
+                mm(:,i) = m';
+                ee(:,i,:) = e';
                 
                 % Compute other stats
                 [pkVal(i), pkIdx(i)] = max(m);
