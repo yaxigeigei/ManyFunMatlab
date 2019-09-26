@@ -2,30 +2,68 @@ classdef MMath
     % MMath is a collection of functions useful for doing math and manipulating data
     
     methods(Static)
-        function [ci, btDist] = BootCI(nboot, bootfun, vect, varargin)
-            %Bootstrap confidence interval similar to the built-in bootci function but faster
+        function [ci, bootstat] = BootCI(nboot, bootfun, varargin)
+            % Bootstraps confidence interval as the built-in bootci function but supports hierarchical bootstrap
             %
-            %   [ci, btDist] = BootCI(nboot, bootfun, vect)
-            %   [ci, btDist] = BootCI(nboot, bootfun, vect, 'alpha', 0.05)
+            %   [ci, bootstat] = BootCI(nboot, bootfun, D)
+            %   [ci, bootstat] = BootCI(nboot, {bootfun, D})
+            %   [ci, bootstat] = BootCI(..., 'alpha', 0.05)
+            %   [ci, bootstat] = BootCI(..., 'Groups', [])
+            %   [ci, bootstat] = BootCI(..., 'Options', statset('bootstrp'))
             %
             % Inputs:
             %   nboot           Number of resampling.
             %   bootfun         Function handle for computation.
-            %   vect            Data to be sent into bootfun.
+            %   D               Data to be sent into bootfun.
+            %   'alpha'         Significance level.
+            %   'Groups'        A numeric array of grouping indices for hierarchical bootstrap. Each column 
+            %                   contains indices for a level, from the highest (first column) to the lowest 
+            %                   (last column). Do not (and no need to) include unique indices for individual 
+            %                   samples as the last column. The default is empty and standard bootstrap 
+            %                   will be used.
             % Output:
             %   ci              Confidence interval.
-            %   btDist          The distribution of computed values from bootstrap.
+            %   bootstat        The distribution of computed values from bootstrap.
             
-            % Handles user inputs
+            % Process user inputs
+            if ~ischar(varargin{1})
+                D = varargin{1};
+                varargin(1) = [];
+            else
+                D = bootfun{2};
+                bootfun = bootfun{1};
+            end
+            
             p = inputParser();
             p.addParameter('alpha', 0.05, @(x) isscalar(x) && x<1 && x>0);
+            p.addParameter('Groups', [], @isnumeric);
+            p.addParameter('Options', statset('bootstrp'));
             p.parse(varargin{:});
-            a = p.Results.alpha * 100;
+            a = p.Results.alpha;
+            G = p.Results.Groups;
+            ops = p.Results.Options;
             
-            btDist = bootstrp(nboot, bootfun, vect);
+            nSample = size(D,1);
+            if isempty(G)
+                G = ones(nSample,1);
+            end
             
-            ci(1,1) = prctile(btDist, a/2);
-            ci(2,1) = prctile(btDist, 100-a/2);
+            % Work out dimensions
+            Dcolons = repmat({':'}, 1, ndims(D)-1);
+            r = bootfun(D);
+            bootstat = zeros(nboot, numel(r));
+            
+            % Compute bootstrap stats
+            for n = 1 : nboot
+                ind = MMath.HierBootSample(G);
+                d = D(ind, Dcolons{:});
+                r = bootfun(d);
+                bootstat(n,:) = r;
+            end
+            
+            % Compute CI
+            bootstat = reshape(bootstat, [nboot size(r)]);
+            ci = prctile(bootstat, 100*[a/2 1-a/2]', 1);
         end
         
         function val = Bound(val, valRange)
@@ -191,6 +229,65 @@ classdef MMath
             
             sizeDist(idxDim) = 1;
             expect = nansum(distMat .* repmat(val, sizeDist), idxDim);
+        end
+        
+        function ind = HierBootSample(G)
+            % Hierarchical bootstrap sampling
+            %
+            %   ind = HierBootSample(G)
+            %
+            % Input
+            %   G       A numeric array of grouping indices for hierarchical bootstrap. Each column 
+            %           contains indices for a level, from the highest (first column) to the lowest 
+            %           (last column). Do not (and no need to) include unique indices for individual 
+            %           samples as the last column.
+            % Output
+            %   ind     Bootstrap sample indices.
+            
+            % Add unique sample indices to the end of grouping indices
+            [nSample, nLevel] = size(G);
+            G = [G, (1:nSample)'];
+            
+            % Sampling
+            GG = sampleHier(G);
+            
+            % Denest cell array
+            for n = 1 : nLevel
+                GG = cat(1, GG{:});
+            end
+            ind = GG;
+            
+            function GG = sampleHier(G)
+                % Split the rest of grouping indices by the top level (1st column) indices
+                G(:,1) = findgroups(G(:,1));
+                GG = splitapply(@(x) {x}, G(:,2:end), G(:,1));
+                
+                % Random sampling with replacement
+                GG = randsample(GG, numel(GG), true);
+                
+                if size(GG{1},2) > 1
+                    % Recursively sample a lower level
+                    for i = 1 : numel(GG)
+                        GG{i} = sampleHier(GG{i});
+                    end
+                else
+                    % Sample the last level
+                    for i = 1 : numel(GG)
+                        GG{i} = randsample(GG{i}, numel(GG{i}), true);
+                    end
+                end
+            end
+            
+%             n1 = 4;
+%             n2 = [3 1 4 4];
+%             n3 = randi(10, sum(n2), 1);
+%             
+%             g1 = repelem((1:n1)', n2');
+%             g1 = repelem(g1, n3');
+%             g2 = repelem((1:sum(n2))', n3');
+%             G = [g1 g2];
+%             
+%             ind = MMath.HierBootSample(G)
         end
         
         function roiInd = Ind2Roi(ind, winRoi, valRange)
@@ -769,4 +866,7 @@ classdef MMath
         end
     end
 end
+
+
+
 
