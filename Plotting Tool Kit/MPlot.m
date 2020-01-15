@@ -207,6 +207,7 @@ classdef MPlot
             % 
             %   MPlot.GroupRibbon(xRange, yRange)
             %   MPlot.GroupRibbon(xRange, yRange, colors)
+            %   MPlot.GroupRibbon(xRange, yRange, ..., 'IndVal', [])
             %   MPlot.GroupRibbon(xRange, yRange, ..., 'Groups', [])
             %   MPlot.GroupRibbon(xRange, yRange, ..., 'Style', 'patch')
             %   MPlot.GroupRibbon(xRange, yRange, ..., 'PlotArgs', {})
@@ -313,12 +314,12 @@ classdef MPlot
                     w = diff(xRange{i});
                     y = [yRange{i} NaN(size(yRange{i},1),1)];
                     x = repmat(mean(xRange{i}), size(y));
-                    line(x, y, 'Color', colors(i,:), 'LineWidth', w, plotArgs{:});
+                    line(x', y', 'Color', colors(i,:), 'LineWidth', w, plotArgs{:});
                 else
                     w = diff(yRange{i});
                     x = [xRange{i} NaN(size(xRange{i},1),1)];
                     y = repmat(mean(yRange{i}), size(x));
-                    line(x, y, 'Color', colors(i,:), 'LineWidth', w, plotArgs{:});
+                    line(x', y', 'Color', colors(i,:), 'LineWidth', w, plotArgs{:});
                 end
             end
             
