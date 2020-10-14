@@ -60,6 +60,13 @@ tbIn = tbIn(:,colInd);
 % Validate and standardize time windows
 tWin = this.IValidateTimeWindows(tWin, height(tbIn), rowInd);
 
+% Fill empty rows with NaN
+for i = 1 : height(tbIn)
+    if isempty(tbIn.time{i})
+        tbIn.time{i} = NaN;
+    end
+end
+
 % Replace Inf with ends of timestamp
 tBound = cellfun(@(x) x([1 end])', tbIn.time, 'Uni', false);
 for i = 1 : numel(tWin)

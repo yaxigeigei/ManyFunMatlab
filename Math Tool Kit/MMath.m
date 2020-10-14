@@ -9,7 +9,6 @@ classdef MMath
             %   [ci, bootstat] = BootCI(nboot, {bootfun, D})
             %   [ci, bootstat] = BootCI(..., 'alpha', 0.05)
             %   [ci, bootstat] = BootCI(..., 'Groups', [])
-            %   [ci, bootstat] = BootCI(..., 'Options', statset('bootstrp'))
             %
             % Inputs:
             %   nboot           Number of resampling.
@@ -58,12 +57,44 @@ classdef MMath
                 ind = MMath.HierBootSample(G);
                 d = D(ind, Dcolons{:});
                 r = bootfun(d);
-                bootstat(n,:) = r;
+                bootstat(n,:) = r(:);
             end
             
             % Compute CI
             bootstat = reshape(bootstat, [nboot size(r)]);
             ci = prctile(bootstat, 100*[a/2 1-a/2]', 1);
+        end
+        
+        function [trainInd, testInd] = BootPartition(n, ptest, nboot)
+            % Create crossvalidation partitions via bootstrap resampling
+            %
+            %   [trainInd, testInd] = MMath.BootPartition(n, ptest)
+            %   [trainInd, testInd] = MMath.BootPartition(group, ptest)
+            %   [trainInd, testInd] = MMath.BootPartition(..., nboot)
+            % 
+            % Inputs:
+            %   n           a
+            %   group       a
+            %   ptest       a
+            %   nboot       a
+            % Outputs:
+            %   trainInd    a
+            %   testInd     a
+            
+            if nargin < 3
+                nboot = 1;
+            end
+            if ~isscalar(n)
+                n = numel(n);
+            end
+            
+            indList = 1 : n;
+            ntest = round(n * ptest);
+            
+            for i = nboot : -1 : 1
+                testInd(:,i) = randsample(n, ntest);
+                trainInd(:,i) = setdiff(indList, testInd(:,i));
+            end
         end
         
         function val = Bound(val, valRange)
@@ -144,6 +175,19 @@ classdef MMath
             
             % Set NaN to zero
             condDist(isnan(condDist)) = 0;
+        end
+        
+        function r = Crossval(func, X, Y, trainInd, testInd)
+            % 
+            
+            for i = size(trainInd,2) : -1 : 1
+                xTrain = X(trainInd(:,i), :);
+                yTrain = Y(trainInd(:,i));
+                xTest = X(testInd(:,i), :);
+                yTest = Y(testInd(:,i));
+                yTestHat = func(xTest, xTrain, yTrain);
+                r(i) = mean(yTestHat == yTest);
+            end
         end
         
         function [x, D] = Decimate(x, r, n, D)
