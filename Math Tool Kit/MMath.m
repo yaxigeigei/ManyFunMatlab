@@ -97,6 +97,60 @@ classdef MMath
             end
         end
         
+        function [H, p] = BootTest2(s1, s2, varargin)
+            % 
+            
+            p = inputParser;
+            p.addParameter('Alpha', 0.05, @isscalar);
+            p.addParameter('NBins', 100, @isscalar);
+            p.parse(varargin{:});
+            alpha = p.Results.Alpha;
+            nBins = p.Results.NBins;
+            
+            if isempty(s1) || isempty(s2)
+                H = NaN;
+                p = NaN;
+                return
+            end
+            
+            % Upsampling
+            s1 = s1(:);
+            s2 = s2(:);
+            % TBW
+            
+            % Fit GMM
+            gm = fitgmdist([s1(:) s2(:)], 1);
+            
+            % Determine the range and resolution of quantization
+            m = gm.mu;
+            sd1 = std(s1);
+            sd2 = std(s2);
+            x = linspace(m(1)-5*sd1, m(1)+5*sd1, nBins);
+            y = linspace(m(2)-5*sd2, m(2)+5*sd2, nBins);
+            [X, Y] = meshgrid(x, y);
+            
+%             a = min([x y]);
+%             b = max([x y]);
+%             figure
+%             plot(s1(:), s2(:), 'k.'); hold on
+%             plot([a b]', [a b]', 'r', 'LineWidth', 2); 
+%             xlabel('ctrl'); ylabel('opto'); axis xy equal tight
+            
+            % Evaluate probability density
+            gmPDF = @(x,y) arrayfun(@(x0,y0) gm.pdf([x0 y0]), x, y);
+            Z = gmPDF(X, Y);
+            Z = Z ./ sum(Z(:));
+            
+            % Calculate propability beyond unity line
+            isSide = X < Y;
+            p = sum(Z(isSide(:)));
+            if p > .5
+                p = max(1-p, 0); % sometimes 1-p can produce 'negative zero'
+            end
+            p = p*2;
+            H = p < alpha;
+        end
+        
         function val = Bound(val, valRange)
             %Bounds input values to specified range or allowed members
             %
