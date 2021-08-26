@@ -150,7 +150,7 @@ classdef MBrowse
         function dirTable = Dir2Table(varargin)
             % List folder contents. It is exactly the same function as dir(...) but output a table. 
             %
-            %   dirTable = MUtil.DirTable( fileDir, fileName )
+            %   dirTable = MBrowse.DirTable(fileDir, fileName)
             %
             
             dirStruct = dir(varargin{:});

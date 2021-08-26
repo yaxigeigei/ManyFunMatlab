@@ -7,6 +7,7 @@ function [tb, preTb] = MakeEventTimesTable(et, varargin)
 %   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(et)
 %   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(..., 'DelimiterTimes', [])
 %   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(..., 'VariableNames', [])
+%   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(..., 'UniformOutput', true)
 %   [tb, preTb] = MSessionExplorer.MakeEventTimesTable(..., 'Verbose', true)
 % 
 % Inputs
@@ -23,6 +24,9 @@ function [tb, preTb] = MakeEventTimesTable(et, varargin)
 %   'VariableNames'
 %           A cell array of column names for the output table. The default names are 
 %           {'event1', 'event2', 'event3', ...}. 
+%   'UniformOutput'
+%           A logical value that indicates whether to allow a column to be a numeric vector
+%           if all elements are scalar. If set to false, all columns will be cell arrays.
 %   'Verbose'
 %           A logical value that controls the display of progress. Default is true. 
 % Outputs
@@ -34,10 +38,12 @@ p = inputParser();
 p.addRequired('et', @(x) isnumeric(x) || iscell(x));
 p.addParameter('DelimiterTimes', [], @isnumeric);
 p.addParameter('VariableNames', []);
+p.addParameter('UniformOutput', true, @islogical);
 p.addParameter('Verbose', true, @islogical);
 p.parse(et, varargin{:});
 delimiterTimes = p.Results.DelimiterTimes;
 varNames = p.Results.VariableNames;
+isUni = p.Results.UniformOutput;
 isVerbose = p.Results.Verbose;
 
 % Unify to cell array
@@ -67,7 +73,14 @@ if isempty(varNames)
     varNames = arrayfun(@(x) ['event' num2str(x)], 1:size(et,2), 'Uni', false);
 end
 
-if ~isempty(delimiterTimes)
+if isempty(delimiterTimes)
+    % Each cell is an epoch
+    if isVerbose
+        disp('Delimiter is not specified. Each cell is treated as an epoch.');
+    end
+    etEpoch = [cell(1, size(et,2)); et];
+    
+else
     % Delimit event times by delimiter times
     if isVerbose
         fprintf('Delimit %d events using %d delimiter times\n', numel(et), numel(delimiterTimes));
@@ -78,13 +91,6 @@ if ~isempty(delimiterTimes)
     for i = numel(et) : -1 : 1
         etEpoch(:,i) = MSessionExplorer.IDelimitTimestamps(et{i}, delimiterTimes);
     end
-    
-elseif isVerbose
-    % Each cell is an epoch
-    if isVerbose
-        disp('Delimiter is not specified. Each cell is treated as an epoch.');
-    end
-    etEpoch = [cell(1, size(et,2)); et];
 end
 
 % Fill empty cells
@@ -93,6 +99,16 @@ etEpoch = FillEmpty(etEpoch);
 % Put data into tables
 preTb = cell2table(etEpoch(1,:), 'VariableNames', varNames);
 tb = cell2table(etEpoch(2:end,:), 'VariableNames', varNames);
+
+% Convert any numeric arrays to cell arrays
+if ~isUni
+    for i = 1 : width(tb)
+        if isnumeric(tb.(i))
+            preTb.(i) = num2cell(preTb.(i));
+            tb.(i) = num2cell(tb.(i));
+        end
+    end
+end
 
 end
 
@@ -123,5 +139,4 @@ for j = 1 : size(C,2)
 end
 
 end
-
 

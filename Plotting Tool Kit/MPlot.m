@@ -1,6 +1,10 @@
 classdef MPlot
     %MPlot A collection of functions useful for plotting
     
+    properties(Constant)
+        isSave = false;
+    end
+    
     methods(Static)
         function varargout = Axes(varargin)
             % Change Axes object with custom defaults
@@ -291,6 +295,10 @@ classdef MPlot
                 for k = 1 : numel(rSeg)
                     cSeg{k} = mean(rSeg{k}, 2);
                     cWidth{k} = repmat(mean(rWidth{k}), size(cSeg{k}));
+                    if isempty(cSeg{k})
+                        cSeg{k} = NaN;
+                        cWidth{k} = NaN;
+                    end
                 end
                 if all(cellfun(@isscalar, cSeg))
                     cSeg = cell2mat(cSeg);
@@ -364,6 +372,7 @@ classdef MPlot
             p = inputParser();
             p.addOptional('h', gcf, @ishandle);
             p.addParameter('FontSize', 6, @isscalar);
+            p.addParameter('FontName', 'arial', @ischar);
             p.addParameter('Zoom', 2, @isscalar);
             p.addParameter('ColumnsWide', [], @isscalar);
             p.addParameter('ColumnsHigh', [], @isscalar);
@@ -373,6 +382,7 @@ classdef MPlot
             p.parse(varargin{:});
             h = p.Results.h;
             fontSize = p.Results.FontSize;
+            fontName = p.Results.FontName;
             z = p.Results.Zoom;
             colsWide = p.Results.ColumnsWide;
             colsHigh = p.Results.ColumnsHigh;
@@ -424,7 +434,7 @@ classdef MPlot
                 for j = 1 : numel(ax)
                     set(ax(j), ...
                         'TickDir', 'out', ...
-                        'FontName', 'arial', ...
+                        'FontName', fontName, ...
                         'FontSize', fontSize*z, ...
                         'LabelFontSizeMultiplier', 1, ...
                         'TitleFontSizeMultiplier', 1);
@@ -698,6 +708,58 @@ classdef MPlot
             cc = cell2mat(cc)';
         end
         
+        function SavePDF(f, path, flag, res)
+            % Saves figure as a pdf with the paper size clipped to the size of the
+            % 
+            %   SavePDF(f, path)
+            %   SavePDF(f, path, flag)
+            %   SavePDF(f, path, flag, res)
+            % 
+            %   f       Figure handle of figure to be saved
+            % 	path    Name of file to be saved
+            %   flag    flag = 0 => save as a regular pdf (default)
+            %           flag = 1 => save with -zbuffer and -r flags
+            %           Setting flag = 1 can help deal with blurry rendering of pdfs on mac
+            %   res     (Only if flag = 1, default 300) resolution of picture
+            % 
+            % Robert Wilson
+            % 18-Mar-2010
+            
+            if ~MPlot.isSave
+                return
+            end
+            
+            if ~exist('flag', 'var')
+                flag = 0;
+            end
+            
+            if ~exist('res', 'var')
+                res = 300;
+            end
+            
+            set(f, 'windowstyle', 'normal')
+            set(f, 'paperpositionmode', 'auto')
+            
+            pp = get(f, 'paperposition');
+            wp = pp(3);
+            hp = pp(4);
+            set(f, 'papersize', [wp hp])
+            
+            if flag
+                print('-painters', f, '-dpdf', ['-r' num2str(res)], '-zbuffer', path);
+            else
+                print('-painters', f, '-dpdf', path);
+            end
+        end
+        
+        function SavePNG(f, path)
+            % Save a figure as PNG file
+            if ~MPlot.isSave
+                return
+            end
+            print(f, path, '-dpng', '-r0');
+        end
+        
         function barLength = ScaleBar(data, heightRatio)
             % Return the length of a scale bar with appropriate length
             %
@@ -842,7 +904,4 @@ classdef MPlot
     end
     
 end
-
-
-
 
