@@ -69,6 +69,67 @@ classdef MNeuro
             ccg = ccg + flip(permute(ccg, [2 1 3]), 3);
         end
         
+        function [centCoords, centInd] = ComputeWaveformCenter(W, chanCoords, featType, locType)
+            % Estimate the location of each waveform
+            % 
+            %   centCoords = MNeuro.ComputeWaveformCenter(W, chanCoords)
+            %   centCoords = MNeuro.ComputeWaveformCenter(W, chanCoords, featType)
+            %   centCoords = MNeuro.ComputeWaveformCenter(W, chanCoords, featType, locType)
+            %
+            % Inputs
+            %   W               1) c-by-t-by-n array of waveforms.
+            %                   2) c-by-1-by-n array of feature values.
+            %                   c is the number of channels. t is the number of timepoints. n is the number of waveforms.
+            %   chanCoords      c-by-d-by-n array of channel coordinates. d is the number of spatial dimensions.
+            % 
+            % Output
+            %   centCoords      n-by-d array of waveform center coordinates.
+            %   centInd         n-element vector of channel indices closest to waveform center.
+            
+            if nargin < 4
+                locType = 'centroid';
+            end
+            
+            if nargin < 3
+                featType = 'power';
+            end
+            
+            [nCh, nTime, nW] = size(W);
+            
+            switch lower(featType)
+                case 'power'
+                    v = sum(W.^2, 2);
+                case 'amplitude'
+                    v = max(W, [], 2) - min(W, [], 2);
+                case 'pc1_proj'
+                    w = reshape(permute(W, [1 3 2]), [nCh*nW nTime]);
+                    [pc, proj] = pca(w);
+                    v = reshape(proj(:,1), [nCh 1 nW]);
+                    v = v - 0.3*max(v, [], 1);
+                    v(v < 0) = 0;
+                case 'computed'
+                    v = W;
+            end
+            
+            switch lower(locType)
+                case 'peak'
+                    [~, centInd] = max(v, [], 1);
+                    centInd = squeeze(centInd);
+                    centCoords = chanCoords(centInd,:,:);
+                case 'centroid'
+                    % Compute centroids as weighted average
+                    centCoords = sum(v.*chanCoords, 1) ./ sum(v, 1);
+                    
+                    % Find closest channel to centroids
+                    d = sqrt(sum((centCoords - chanCoords).^2, 2));
+                    [~, centInd] = min(d, [], 1);
+                    
+                    centInd = permute(centInd, [3 2 1]);
+                    centCoords = permute(centCoords, [3 2 1]);
+            end
+            
+        end
+        
         function [r, varargout] = Filter1(r, fs, methodOpt, varargin)
             % Filter activity or bin spike times using standard methods
             % 
