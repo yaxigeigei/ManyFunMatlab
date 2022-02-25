@@ -11,7 +11,7 @@ classdef MSessionExplorer < handle
     %     MSessionExplorer.Examples.Merge
     % 
     %   Content Management
-    %     MSessionExplorer.Examples.Preview
+    %     MSessionExplorer.Examples.Peek
     %     MSessionExplorer.Examples.SetTable
     %     MSessionExplorer.Examples.SetReferenceTime
     %     MSessionExplorer.Examples.SetColumn
@@ -111,11 +111,11 @@ classdef MSessionExplorer < handle
         end
         
         % Content Management
-        function Preview(this, varargin)
+        function Peek(this, varargin)
             % Print a summary of the main content of this object or the begining of specific table(s)
             %   
-            %   Preview()
-            %   Preview(tbName1, tbName2, tbName3, ...)
+            %   Peek()
+            %   Peek(tbName1, tbName2, tbName3, ...)
             % 
             % Inputs
             %   tbNameN         Name of a data table to display. 
