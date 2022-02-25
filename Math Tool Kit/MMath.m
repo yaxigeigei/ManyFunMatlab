@@ -176,6 +176,26 @@ classdef MMath
             end
         end
         
+        function mask = Bounds2Logical(bb, vecLength)
+            % Convert a vector of indices to logical mask
+            %
+            %   mask = MMath.Bounds2Logical(bb, vecLength)
+            %
+            % Inputs:
+            %   bb          A n-by-2 matrix, where each row bounds a range of indices (inclusive)
+            %   vecLength   The length of the output vector
+            % Output:
+            %   mask        A logical vector where the bounded elements are true
+            
+            assert(size(bb,2)==2, 'The size of the second dimension of the bounds (bb) must equal two');
+            
+            mask = false(vecLength, 1);
+            
+            for i = 1 : size(bb,1)
+                mask(bb(i,1) : bb(i,2)) = true;
+            end
+        end
+        
         function B = CombineDims(A, dims)
             % Reshape array by combining specified dimensinons
             % 
@@ -726,7 +746,6 @@ classdef MMath
             %
             %   [m, qt, ad] = MMath.MedianStats(A)
             %   [m, qt, ad] = MMath.MedianStats(A, dim)
-            %   [m, qt, ad] = MMath.MedianStats(A, dim, isoutlierArg, ...)
             %
             % Inputs
             %   A           Numeric array of samples.
@@ -748,7 +767,7 @@ classdef MMath
                 end
             end
             
-            m = nanmedian(A, dim);
+            m = median(A, dim, 'omitnan');
             qt = prctile(A, [25 75], dim);
             ad = mad(A, 1, dim);
         end

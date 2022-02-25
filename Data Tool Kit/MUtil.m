@@ -77,6 +77,45 @@ classdef MUtil
             xlsTb = readtable(xlsPath, 'Sheet', sheetId, varargin{:});
         end
         
+        function [txtStr, txtLines] = ReadTxt(svPath)
+            % Read plain text of SatellitesViewer log to string(s). 
+            % 
+            %   [txtStr, txtLines] = Satellites.ReadTxt()
+            %   [txtStr, txtLines] = Satellites.ReadTxt(svPath)
+            % 
+            % Input
+            %   svPath              The path of a SatellitesViewer log file. In fact, you can use this method
+            %                       to read any text file where lines are delimited by newline return \n. If 
+            %                       svPath is not specified, a file selection window will be prompted. 
+            % Outputs
+            %   txtStr              The entire text file in a single string (character array). 
+            %   txtLines            A cell array where each element is a line of the text. 
+            % 
+            
+            % Handles user input
+            if nargin < 1 || isempty(svPath)
+                [svName, svDir] = uigetfile('*.txt', 'Please select a SatellitesViewer log file');
+                if ~svName
+                    txtStr = '';
+                    txtLines = {};
+                    return;
+                end
+                svPath = fullfile(svDir, svName);
+            end
+            
+            % Read SatellitesViewer log file to text
+            try
+                fid = fopen(svPath);
+                txtStr = fread(fid, '*char')';
+                fclose(fid);
+            catch
+                fclose(fid);
+                error(['Error occured when reading ' svPath]);
+            end
+            
+            % Split text string into lines
+            txtLines = Satellites.StringToLines(txtStr);
+        end
     end
 end
 

@@ -1,10 +1,15 @@
 classdef MPlotter < handle
-    %MPlotter Summary of this class goes here
-    %   Detailed explanation goes here
+    % MPlotter Summary of this class goes here
+    % 
+    % Available info in the ax object passed as the first argument to user functions
+    %   ax.UserData.epoch
+    %   ax.UserData.time
+    %   ax.UserData.timeLimits
+    %   ax.UserData.zoom
     
     properties
-        defaultTimeChange = 0.005;
-        defaultTrialChange = 1;
+        defaultTimeChange = 0.005;	% default 
+        defaultEpochChange = 1;     % default number 
         defaultZoomChange = 1;
         zoom = 0;
         plotTable;
@@ -28,18 +33,20 @@ classdef MPlotter < handle
         end
         
         function ResetPlotTable(this)
+            % Initialize or reset the plotTable to default
             columnNames = {'figureNumber', 'figureObj', 'subplot', 'axesObj', 'functionHandle', 'variableName', 'updateOption'};
             exampleRows = { ...
                 1, [], '3,1,1', [], @MPlotter.PlotTimeIndicator, '', 'time'; ...
-                1, [], '3,1,2:3', [], @MPlotter.PlotTimeIndicator, '', 'trial'};
+                1, [], '3,1,2:3', [], @MPlotter.PlotTimeIndicator, '', 'epoch'};
             this.plotTable = cell2table(exampleRows, 'VariableNames', columnNames);
         end
         
         function ResetCallbackTable(this)
+            % Initialize or reset callbackTable to default
             columnNames = {'functionHandle', 'variableName', 'callbackOption', 'updateOption'};
             exampleRows = { ...
                 [], '', 'keypress', 'time'; ...
-                [], '', 'keyrelease', 'trial'};
+                [], '', 'keyrelease', 'epoch'};
             this.callbackTable = cell2table(exampleRows, 'VariableNames', columnNames);
         end
         
@@ -73,25 +80,25 @@ classdef MPlotter < handle
             figPos = get(this.gui.fig, 'Position');
             set(this.gui.fig, 'Position', [figPos(1:2) ww wh]);
             
-            % Trial
+            % Epoch
             x = s; y = s;
             uicontrol(this.gui.fig, ...
                 'Style', 'text', ...
-                'String', 'Trial #  ', ...
+                'String', 'Epoch  ', ...
                 'FontSize', 9, ...
                 'HorizontalAlignment', 'right', ...
                 'Units', 'pixel', ...
                 'Position', [x y-2 45 uh]);
             x = x + 45;
             
-            this.gui.trialEdit = uicontrol(this.gui.fig, ...
+            this.gui.epochEdit = uicontrol(this.gui.fig, ...
                 'Style', 'edit', ...
                 'String', '1', ...
                 'FontSize', 9, ...
                 'HorizontalAlignment', 'left', ...
                 'Units', 'pixel', ...
                 'Position', [x y 45 uh], ...
-                'KeyReleaseFcn', @this.TrialEditChange, ...
+                'KeyReleaseFcn', @this.EpochEditChange, ...
                 'Interruptible', 'off', ...
                 'BusyAction', 'cancel');
             x = x + 45;
@@ -158,7 +165,7 @@ classdef MPlotter < handle
             x = x + 15;
             uicontrol(this.gui.fig, ...
                 'Style', 'pushbutton', ...
-                'String', 'Refresh all', ...
+                'String', 'Refresh all (r)', ...
                 'FontSize', 9, ...
                 'Units', 'pixel', ...
                 'Position', [x y-1 100 uh+2], ...
@@ -175,8 +182,9 @@ classdef MPlotter < handle
                 "Shortcuts"; ...
                 "*  Left arrow: go backward in time"; ...
                 "*  Right arrow: go forward in time"; ...
-                "*  Up arrow: decrease trial number"; ...
-                "*  Down arrow: increase trial number"; ...
+                "*  Up arrow: decrease epoch number"; ...
+                "*  Down arrow: increase epoch number"; ...
+                "*  +/-: increase/decrease zoom level";
                 ];
             
             uicontrol(this.gui.fig, ...
@@ -189,11 +197,11 @@ classdef MPlotter < handle
             
             noteStr = [ ...
                 "Modifiers"; ...
-                "*  None: 5 ms or 1 trial"; ...
+                "*  None: 5 ms or 1 epoch"; ...
                 "*  Alt: 1 ms";
-                "*  Ctrl: 25 ms or 2 trial"; ...
-                "*  Shift: 100 ms or 10 trial"; ...
-                "*  Ctrl + Shift: 500 ms or 20 trial"; ...
+                "*  Ctrl: 25 ms or 2 epoch"; ...
+                "*  Shift: 100 ms or 10 epoch"; ...
+                "*  Ctrl + Shift: 500 ms or 20 epoch"; ...
                 ];
             
             x = ww/2;
@@ -208,13 +216,26 @@ classdef MPlotter < handle
             
             % Update GUI
             this.UpdateRoutine();
-            
-            % Show instruction
-%             eval('help MImgBaseClass.Viewer');
         end
         
-        function vidMat = MakeVideo(this, h, dTime, varargin)
+        function vidMat = MakeVideo(this, f, dTime, varargin)
+            % Generate video from a figure window and optionally save to a video file.
+            % The start and end times are determined by the time limit text boxes.
             % 
+            %   vidMat = MakeVideo(f, dTime)
+            %   vidMat = MakeVideo(..., 'filePath', [], 'frameRate', [])
+            % 
+            % Inputs
+            %   f               A figure handle.
+            %   dTime           The amount of time increment in second for the animation. This is 
+            %                   the time in data, not for video playback.
+            %   'filePath'      The file path to save.
+            %   'frameRate'     The frame rate of the saved video file. This controls the speed 
+            %                   of playback.
+            % Output
+            %   vidMat          A height-by-width-by-frames-by-RGB array of video frames.
+            %                   A video file is save only when both 'filePath' and 'frameRate' are 
+            %                   specified, but vidMat is always returned.
             
             % Handle user inputs
             p = inputParser();
@@ -236,14 +257,14 @@ classdef MPlotter < handle
             for k = 1 : numFr
                 this.UpdateRoutine('time', tFr(k));
                 drawnow;
-                vidMat(k) = getframe(h);
+                vidMat(k) = getframe(f);
             end
             
             vidMat = cat(4, vidMat.cdata);
             
             % Output video
             if ~isempty(filePath) && ~isempty(frRate)
-                vidObj = VideoWriter(filePath);
+                vidObj = VideoWriter(filePath, 'MPEG-4');
                 vidObj.Quality = 95;
                 vidObj.FrameRate = frRate;
                 
@@ -260,7 +281,7 @@ classdef MPlotter < handle
     
     methods(Access = private)
         function IntializeLayout(this)
-            % Create figures and axes according to plotTable
+            % Create figures and axes according to the plotTable
             
             isNewFig = false;
             
@@ -277,7 +298,9 @@ classdef MPlotter < handle
                 
                 % Make figure if not exsiting
                 if isempty(figObj) || ~ishandle(figObj) || ~isvalid(figObj)
-                    this.plotTable.figureObj{i} = figure(figNum);
+                    f = figure(figNum);
+                    f.Color = 'w';
+                    this.plotTable.figureObj{i} = f;
                     isNewFig = true;
                 end
                 
@@ -287,14 +310,14 @@ classdef MPlotter < handle
                 end
             end
             
-            % Trun focus back to main window
+            % Turn focus back to main window
             if isNewFig
                 figure(this.gui.fig);
             end
         end
         
         function ui = GetUIVars(this)
-            ui.trialNum = str2double(this.gui.trialEdit.String);
+            ui.epoch = str2double(this.gui.epochEdit.String);
             ui.time = str2double(this.gui.timeEdit.String);
             ui.timeLims(1) = str2double(this.gui.limitEdit1.String);
             ui.timeLims(2) = str2double(this.gui.limitEdit2.String);
@@ -303,7 +326,7 @@ classdef MPlotter < handle
         function UpdateRoutine(this, updateType, newVal)
             
             if nargin < 2
-                updateType = 'trial';
+                updateType = 'epoch';
             end
             
             % Apply new value to UI
@@ -311,8 +334,8 @@ classdef MPlotter < handle
                 switch updateType
                     case 'time'
                         this.gui.timeEdit.String = num2str(newVal);
-                    case 'trial'
-                        this.gui.trialEdit.String = num2str(newVal);
+                    case 'epoch'
+                        this.gui.epochEdit.String = num2str(newVal);
                 end
             end
             
@@ -327,7 +350,7 @@ classdef MPlotter < handle
                 
                 % Unpack plotting variables
                 axObj = this.plotTable.axesObj{i};
-                axObj.UserData.trialNum = ui.trialNum;
+                axObj.UserData.epoch = ui.epoch;
                 axObj.UserData.time = ui.time;
                 axObj.UserData.zoom = this.zoom;
                 
@@ -352,12 +375,12 @@ classdef MPlotter < handle
                 switch updateOption
                     case 'time'
                         % always update
-                    case 'trial'
+                    case {'epoch', 'trial'}
                         if strcmp(updateType, {'time'})
                             continue;
                         end
                     case 'manual'
-                        if any(strcmp(updateType, {'time', 'trial'}))
+                        if any(strcmp(updateType, {'time', 'epoch'}))
                             continue;
                         end
                     otherwise
@@ -412,17 +435,17 @@ classdef MPlotter < handle
             this.CallbackRoutine(ui, 'keypress');
             
             % Execute built-in callbacks
-            dTrial = this.defaultTrialChange;
+            dEpoch = this.defaultEpochChange;
             dTime = this.defaultTimeChange;
             if ismember(eventdata.Modifier, {'alt', 'option'})
                 dTime = dTime / 5;
             end
             if ismember('control', eventdata.Modifier)
-                dTrial = dTrial * 2;
+                dEpoch = dEpoch * 2;
                 dTime = dTime * 5;
             end
             if ismember('shift', eventdata.Modifier)
-                dTrial = dTrial * 10;
+                dEpoch = dEpoch * 10;
                 dTime = dTime * 20;
             end
 %             disp(eventdata.Modifier);
@@ -434,9 +457,9 @@ classdef MPlotter < handle
                 case 'leftarrow'
                     this.UpdateRoutine('time', ui.time - dTime);
                 case 'downarrow'
-                    this.UpdateRoutine('trial', ui.trialNum + dTrial);
+                    this.UpdateRoutine('epoch', ui.epoch + dEpoch);
                 case 'uparrow'
-                    this.UpdateRoutine('trial', ui.trialNum - dTrial);
+                    this.UpdateRoutine('epoch', ui.epoch - dEpoch);
                 case {'equal', 'add'}
                     this.zoom = this.zoom + 1;
                     this.UpdateRoutine('time');
@@ -474,9 +497,9 @@ classdef MPlotter < handle
             % none
         end
         
-        function TrialEditChange(this, src, eventdata)
+        function EpochEditChange(this, src, eventdata)
             if strcmp(eventdata.Key, 'return')
-                this.UpdateRoutine('trial', str2double(src.String));
+                this.UpdateRoutine('epoch', str2double(src.String));
             end
         end
         
@@ -506,7 +529,7 @@ classdef MPlotter < handle
     methods(Static)
         function PlotTimeIndicator(ax, inputVar)
             
-            tr = ax.UserData.trialNum;
+            ep = ax.UserData.epoch;
             t = ax.UserData.time;
             tLims = ax.UserData.timeLimits;
             z = 2^(-ax.UserData.zoom);
