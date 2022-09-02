@@ -4,29 +4,13 @@ classdef MUtil
     
     methods(Static)
         function s = CombineStructs(varargin)
-            % Combine multiple structures into one. Field names must be unique across structures. 
+            % Combine multiple structs into one. Field names must be unique across structures. 
             %
             %   s = MUtil.CombineStructs(varargin)
             % 
             
             tbs = cellfun(@(x) struct2table(x, 'AsArray', true), varargin, 'Uni', false);
             s = table2struct(cat(2, tbs{:}));
-        end
-        
-        function dirTable = Dir2Table(varargin)
-            % List folder contents. It is exactly the same function as dir(...) but output a table. 
-            %
-            %   dirTable = MUtil.DirTable( fileDir, fileName )
-            %
-            
-            dirStruct = dir(varargin{:});
-            dirTable = struct2table(dirStruct);
-            
-            for i = 1 : width(dirTable)
-                if ischar(dirTable.(i))
-                    dirTable.(i) = {dirTable.(i)};
-                end
-            end
         end
         
         function hit = MatchAnyRegExp(str, expressions)
@@ -80,8 +64,8 @@ classdef MUtil
         function [txtStr, txtLines] = ReadTxt(svPath)
             % Read plain text of SatellitesViewer log to string(s). 
             % 
-            %   [txtStr, txtLines] = Satellites.ReadTxt()
-            %   [txtStr, txtLines] = Satellites.ReadTxt(svPath)
+            %   [txtStr, txtLines] = MUtil.ReadTxt()
+            %   [txtStr, txtLines] = MUtil.ReadTxt(svPath)
             % 
             % Input
             %   svPath              The path of a SatellitesViewer log file. In fact, you can use this method
@@ -114,7 +98,18 @@ classdef MUtil
             end
             
             % Split text string into lines
-            txtLines = Satellites.StringToLines(txtStr);
+            txtLines = MUtil.StringToLines(txtStr);
+        end
+        
+        function txtLines = StringToLines(txtStr)
+            % Split a string into lines based on return characters. Empty lines are removed. 
+            %
+            %   txtLines = MUtil.StringToLines(txtStr)
+            %
+            
+            txtLines = strsplit(txtStr, {'\n', '\r'})';
+            isEmpty = cellfun(@isempty, txtLines);
+            txtLines(isEmpty) = [];
         end
     end
 end
