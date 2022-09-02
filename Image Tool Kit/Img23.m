@@ -336,6 +336,55 @@ classdef Img23 < MImgBaseClass
             
             img = cast(img, dataType);
         end
+        
+        function [img, affObj] = Transform(img, varargin)
+            % Translate, rotate, scale, and crop an image, in this order
+            %
+            %   [img, affObj] = Transform(img)
+            %   [img, affObj] = Transform(..., 'Translate', [0 0])
+            %   [img, affObj] = Transform(..., 'Rotate', 0)
+            %   [img, affObj] = Transform(..., 'Scale', [1 1])
+            %   [img, affObj] = Transform(..., 'Crop', size(img))
+            %
+            % Inputs:
+            %   img             A grayscle or rgb image.
+            %   'Translate'     Two-element vector for the pixels to translate in x and y direction.
+            %   'Rotate'        Degree to rotate. Positive is clockwise.
+            %   'Scale'         Two-element vector for the scaling factors in x and y direction.
+            %   'Crop'          Two-element vector of the output image size.
+            % Outputs:
+            %   img             Transformed image.
+            %   affObj          The affine2d object that implements the transformation and has relevant
+            %                   information. It can also be used for inverse transformation.
+            
+            p = inputParser();
+            p.addParameter('Translate', [0 0], @(x) isnumeric(x) && numel(x)==2);
+            p.addParameter('Rotate', 0, @(x) isnumeric(x) && isscalar(x));
+            p.addParameter('Scale', [1 1], @(x) isnumeric(x) && numel(x)==2);
+            p.addParameter('Crop', size(img), @(x) isnumeric(x) && numel(x)==2);
+            p.parse(varargin{:});
+            a = p.Results.Rotate;
+            sx = p.Results.Scale(1);
+            sy = p.Results.Scale(2);
+            tx = p.Results.Translate(1);
+            ty = p.Results.Translate(2);
+            cr = p.Results.Crop(1:2);
+            
+            sz = size(img);
+            sz = sz(1:2);
+            dCenter = flip((sz-1)/2);
+            dCr = flip((cr-sz)/2);
+            
+            centerMat = [1 0 0; 0 1 0; -dCenter 1];
+            transMat = [1 0 0; 0 1 0; tx ty 1];
+            rotateMat = [cosd(a) sind(a) 0; -sind(a) cosd(a) 0; 0 0 1];
+            scaleMat = [sx 0 0; 0 sy 0; 0 0 1];
+            resetMat = [1 0 0; 0 1 0; dCenter+dCr 1];
+            affObj = affine2d(centerMat*transMat*rotateMat*scaleMat*resetMat);
+            
+            refObj = imref2d(cr);
+            img = imwarp(img, affObj, 'OutputView', refObj);
+        end
     end
     
 end

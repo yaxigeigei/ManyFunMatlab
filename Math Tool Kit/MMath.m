@@ -822,6 +822,16 @@ classdef MMath
             r2adj = 1 - (n-1)/(n-p) * SSE./TSS;
         end
         
+        function [a, I] = SortLike(a, b)
+            % Sort elements in 'a' as how these elements are ordered in 'b'
+            b = b(ismember(b, a));
+            I = zeros(size(a));
+            for i = 1 : numel(a)
+                I(i) = find(a==b(i));
+            end
+            a = a(I);
+        end
+        
         function B = SqueezeDims(A, dims)
             % Squeeze only the specified dimensions
             %
