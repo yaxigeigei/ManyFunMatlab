@@ -550,15 +550,12 @@ classdef MSessionExplorer < handle
                     % For eventTimes table
                     tb = this.tot.tableData{k};
                     for i = 1 : size(tb, 2)
-                        if isnumeric(tb{:,i})
-                            % Numeric vector
-                            tb{:,i} = tb{:,i} - et;
-                        elseif iscell(tb{:,i})
+                        if iscell(tb{:,i})
                             % Cell vector of numeric vectors
                             tb{:,i} = cellfun(@(x,r) x-r, tb{:,i}, num2cell(et), 'Uni', false);
                         else
-                            warning(fprintf('Failed to align data in the ''%s'' column of ''%s'' table\n', ...
-                                tb.Properties.VariableNames{i}, this.tableName{k}));
+                            % Numeric vector
+                            tb{:,i} = tb{:,i} - et;
                         end
                     end
                     this.tot.tableData{k} = tb;
