@@ -218,63 +218,107 @@ classdef MPlotter < handle
             this.UpdateRoutine();
         end
         
-        function vidMat = MakeVideo(this, f, dTime, varargin)
+        function val = GetEpoch(this)
+            % Get the current epoch from UI
+            val = str2double(this.gui.epochEdit.String);
+        end
+        
+        function val = GetTime(this)
+            % Get the current time from UI
+            val = str2double(this.gui.timeEdit.String);
+        end
+        
+        function val = GetTimeLimits(this)
+            % Get the time limits from UI
+            val = str2double({this.gui.limitEdit1.String, this.gui.limitEdit2.String});
+        end
+        
+        function SetEpoch(this, epoch)
+            % Programatically change the current epoch
+            this.UpdateRoutine('epoch', epoch);
+        end
+        
+        function SetTime(this, time)
+            % Programatically change the current time
+            this.UpdateRoutine('time', time);
+        end
+        
+        function SetTimeLimits(this, lims)
+            % Programatically change the time limits
+            this.gui.limitEdit1.String = num2str(lims(1));
+            this.gui.limitEdit2.String = num2str(lims(2));
+            this.UpdateRoutine('time');
+        end
+        
+        function frames = MakeVideo(this, fig, dTime, varargin)
             % Generate video from a figure window and optionally save to a video file.
             % The start and end times are determined by the time limit text boxes.
             % 
-            %   vidMat = MakeVideo(f, dTime)
-            %   vidMat = MakeVideo(..., 'filePath', [], 'frameRate', [])
+            %   frames = MakeVideo(fig, dTime)
+            %   frames = MakeVideo(..., 'filePath', [], 'frameRate', [])
             % 
             % Inputs
-            %   f               A figure handle.
+            %   fig             A figure handle.
             %   dTime           The amount of time increment in second for the animation. This is 
             %                   the time in data, not for video playback.
-            %   'filePath'      The file path to save.
-            %   'frameRate'     The frame rate of the saved video file. This controls the speed 
-            %                   of playback.
+            %   'FilePath'      The file path to save.
+            %   'FrameRate'     The frame rate of the saved video file. This together with dTime controls
+            %                   the speed of playback.
             % Output
-            %   vidMat          A height-by-width-by-frames-by-RGB array of video frames.
+            %   frames          A height-by-width-by-frames-by-RGB array of video frames.
             %                   A video file is save only when both 'filePath' and 'frameRate' are 
             %                   specified, but vidMat is always returned.
             
             % Handle user inputs
             p = inputParser();
-            p.addParameter('filePath', [], @ischar);
-            p.addParameter('frameRate', [], @isscalar);
+            p.addParameter('FilePath', [], @(x) ischar(x) || isstring(x));
+            p.addParameter('FrameRate', [], @isscalar);
             p.parse(varargin{:});
-            filePath = p.Results.filePath;
-            frRate = p.Results.frameRate;
+            filePath = p.Results.FilePath;
+            frRate = p.Results.FrameRate;
             
             % Get variables
             timeLims(1) = str2double(this.gui.limitEdit1.String);
             timeLims(2) = str2double(this.gui.limitEdit2.String);
             
-            % Capture frames
+            % Preallocation
+            vids = cell(size(fig));
             tFr = timeLims(1) : dTime : timeLims(2);
             numFr = numel(tFr);
-            vidMat(numFr) = struct('cdata', [], 'colormap', []);
+            for f = 1 : numel(fig)
+                vids{f}(numFr) = struct('cdata', [], 'colormap', []);
+            end
             
+            % Capture frames
             for k = 1 : numFr
                 this.UpdateRoutine('time', tFr(k));
                 drawnow;
-                vidMat(k) = getframe(f);
+                for f = 1 : numel(fig)
+                    vids{f}(k) = getframe(fig(f));
+                end
             end
             
-            vidMat = cat(4, vidMat.cdata);
-            
             % Output video
-            if ~isempty(filePath) && ~isempty(frRate)
-                vidObj = VideoWriter(filePath, 'MPEG-4');
-                vidObj.Quality = 95;
-                vidObj.FrameRate = frRate;
+            filePath = string(filePath);
+            if isscalar(frRate)
+                frRate = repelem(frRate, numel(fig));
+            end
+            for f = 1 : numel(fig)
+                frames = cat(4, vids{f}.cdata);
                 
-                open(vidObj);
-                try
-                    writeVideo(vidObj, vidMat);
-                catch
+                if numel(filePath) >= f && ~isempty(frRate)
+                    vidObj = VideoWriter(filePath(f), 'MPEG-4');
+                    vidObj.Quality = 95;
+                    vidObj.FrameRate = frRate(f);
+                    
+                    open(vidObj);
+                    try
+                        writeVideo(vidObj, frames);
+                    catch
+                        close(vidObj);
+                    end
                     close(vidObj);
                 end
-                close(vidObj);
             end
         end
     end
@@ -298,15 +342,15 @@ classdef MPlotter < handle
                 
                 % Make figure if not exsiting
                 if isempty(figObj) || ~ishandle(figObj) || ~isvalid(figObj)
-                    f = figure(figNum);
-                    f.Color = 'w';
-                    this.plotTable.figureObj{i} = f;
+                    figObj = figure(figNum);
+                    figObj.Color = 'w';
+                    this.plotTable.figureObj{i} = figObj;
                     isNewFig = true;
                 end
                 
                 % Make axes if not exsiting
                 if isempty(axesObj) || ~ishandle(axesObj) || ~isvalid(axesObj)
-                    this.plotTable.axesObj{i} = subplot(sp{:}, 'Parent', figNum);
+                    this.plotTable.axesObj{i} = subplot(sp{:}, 'Parent', figObj);
                 end
             end
             
