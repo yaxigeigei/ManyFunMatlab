@@ -154,7 +154,7 @@ classdef MSpikeGLX
         end
         
         function digArray = ExtractDigital(dataArray, meta, dwReq, dLineList)
-            % Return an array [lines X timepoints] of uint8 values for
+            % Return an array [timepoints X lines] of logical values for
             % a specified set of digital lines.
             %
             % - dwReq is the one-based index into the saved file of the
@@ -182,10 +182,10 @@ classdef MSpikeGLX
                     digCh = MN + MA + XA + dwReq;
                 end
             end
-            [~,nSamp] = size(dataArray);
-            digArray = zeros(numel(dLineList), nSamp, 'uint8');
+            nSamp = size(dataArray, 1);
+            digArray = zeros(nSamp, numel(dLineList), 'logical');
             for i = 1:numel(dLineList)
-                digArray(i,:) = bitget(dataArray(digCh,:), dLineList(i)+1, 'int16');
+                digArray(:,i) = bitget(int16(dataArray(:,digCh)), dLineList(i)+1);
             end
         end
         

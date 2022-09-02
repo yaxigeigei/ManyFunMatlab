@@ -69,56 +69,47 @@ classdef MNeuro
             ccg = ccg + flip(permute(ccg, [2 1 3]), 3);
         end
         
-        function [centCoords, centInd] = ComputeWaveformCenter(W, chanCoords, featType, locType)
+        function [centCoords, centInd, fv] = ComputeWaveformCenter(W, chanCoords, featType, locType)
             % Estimate the location of each waveform
             % 
-            %   centCoords = MNeuro.ComputeWaveformCenter(W, chanCoords)
-            %   centCoords = MNeuro.ComputeWaveformCenter(W, chanCoords, featType)
-            %   centCoords = MNeuro.ComputeWaveformCenter(W, chanCoords, featType, locType)
+            %   [centCoords, centInd, fv] = MNeuro.ComputeWaveformCenter(W, chanCoords)
+            %   [centCoords, centInd, fv] = MNeuro.ComputeWaveformCenter(W, chanCoords, featType)
+            %   [centCoords, centInd, fv] = MNeuro.ComputeWaveformCenter(W, chanCoords, featType, locType)
             %
             % Inputs
             %   W               1) c-by-t-by-n array of waveforms.
             %                   2) c-by-1-by-n array of feature values.
-            %                   c is the number of channels. t is the number of timepoints. n is the number of waveforms.
+            %                   c is the number of channels. t is the number of timepoints. n is the number of waveform.
             %   chanCoords      c-by-d-by-n array of channel coordinates. d is the number of spatial dimensions.
+            %   featType        What feature to use - 'power' (default), 'amplitude', or 'computed'.
+            %   locType         Where to find - 'centroid' (default) or 'peak'.
             % 
             % Output
             %   centCoords      n-by-d array of waveform center coordinates.
             %   centInd         n-element vector of channel indices closest to waveform center.
+            %   fv              c-by-1-by-n array of feature values.
+            % 
             
-            if nargin < 4
+            if nargin < 3 || isempty(featType)
+                featType = 'power';
+            end
+            if nargin < 4 || isempty(locType)
                 locType = 'centroid';
             end
             
-            if nargin < 3
-                featType = 'power';
-            end
-            
-            [nCh, nTime, nW] = size(W);
-            
             switch lower(featType)
                 case 'power'
-                    v = sum(W.^2, 2);
+                    fv = sum(W.^2, 2);
                 case 'amplitude'
-                    v = max(W, [], 2) - min(W, [], 2);
-                case 'pc1_proj'
-                    w = reshape(permute(W, [1 3 2]), [nCh*nW nTime]);
-                    [pc, proj] = pca(w);
-                    v = reshape(proj(:,1), [nCh 1 nW]);
-                    v = v - 0.3*max(v, [], 1);
-                    v(v < 0) = 0;
+                    fv = max(W, [], 2) - min(W, [], 2);
                 case 'computed'
-                    v = W;
+                    fv = W;
             end
             
             switch lower(locType)
-                case 'peak'
-                    [~, centInd] = max(v, [], 1);
-                    centInd = squeeze(centInd);
-                    centCoords = chanCoords(centInd,:,:);
                 case 'centroid'
-                    % Compute centroids as weighted average
-                    centCoords = sum(v.*chanCoords, 1) ./ sum(v, 1);
+                    % Compute centroids by weighted average
+                    centCoords = sum(fv.*chanCoords, 1) ./ sum(fv, 1);
                     
                     % Find closest channel to centroids
                     d = sqrt(sum((centCoords - chanCoords).^2, 2));
@@ -126,8 +117,47 @@ classdef MNeuro
                     
                     centInd = permute(centInd, [3 2 1]);
                     centCoords = permute(centCoords, [3 2 1]);
+                    
+                case 'peak'
+                    [~, centInd] = max(fv, [], 1);
+                    centInd = squeeze(centInd);
+                    centCoords = chanCoords(centInd,:,:);
+            end
+        end
+        
+        function csd = CSD(lfp, dz)
+            % Compute current source sensity from LFP using method from Ulbert et al. J Neurosci Methoods 2001
+            % 
+            %   csd = CSD(lfp, dz)
+            % 
+            % Inputs:
+            %   lfp         A time-by-channel array of LFP voltages.
+            %   dz          The spacing of channels.
+            % Output:
+            %   csd         A time-by-channel array of CSD values.
+            %
+            
+            if ~exist('dz', 'var')
+                dz = 1;
             end
             
+            % 5 point hamming filter from Ulbert et al. J Neurosci Methoods 2001
+            % ('Multiple microelectrode-recording system for intracortical
+            % applications') - equation 5 for spatial smoothing of signal
+            w = [0.23, 0.08, -0.62, 0.08, .23];
+            csd = conv2(lfp, w, 'same') / (2*dz)^2;
+            
+%             for i = 1 : size(lfp,1)
+%                 if i-2 > 0 && i+2 < size(lfp,1)+1
+%                     u1 = lfp(i-2,:);
+%                     u2 = lfp(i-1,:);
+%                     u3 = lfp(i,:);
+%                     u4 = lfp(i+1,:);
+%                     u5 = lfp(i+2,:);
+%                     csd(i,:) = -(w(1)*u1 + w(2)*u2 + w(3)*u3 + w(4)*u4 +w(5)*u5)/(2*dz*2*dz);
+%                 end
+%             end
+%             csd = csd(3:end,:);
         end
         
         function [r, varargout] = Filter1(r, fs, methodOpt, varargin)
@@ -360,11 +390,12 @@ classdef MNeuro
             %   T               A cell array or a table of event time vectors. Rows are repeats 
             %                   (e.g. trials); columns are different types of event (e.g. units). 
             %   edges           Edges of time bins in a numeric vector. 
-            %   ciArgs          
+            %   ciArgs          Confidence interval-related Name-Value pairs supported by MMath.MeanStats.
+            %                   Use 'help MMath.MeanStats' for details.
             % Outputs
             %   mm              An array of mean event rates. Rows are time bins and columns are 
             %                   different types of event. 
-            %   ee              Standard error of elements in mm. 
+            %   ee              Standard error or CI of elements in mm. 
             %   stats           A table with the following variables.
             %     colNum          Column index of each event in T.
             %     pkIdx           Index of the time bin where each trace in mm peaks.
@@ -387,7 +418,7 @@ classdef MNeuro
                 end
                 hh = cell2mat(hh);
                 
-                % Compute mean and sem of event rate
+                % Compute mean and error of event rate
                 if exist('ciArgs', 'var')
                     [m, ~, ~, e] = MMath.MeanStats(hh, ciArgs{:});
                 else
@@ -411,22 +442,26 @@ classdef MNeuro
             stats.entropy = I';
         end
         
-        function [mm, ee, stats] = MeanTimeSeries(S, ciArgs)
+        function [mm, ee, stats] = MeanTimeSeries(S, varargin)
             % Compute mean and related stats of multiple time series across repetitions
             %
             %   [mm, ee, stats] = MNeuro.MeanTimeSeries(S)
+            %   [mm, ee, stats] = MNeuro.MeanTimeSeries(S, ciArgs)
             %
             % Inputs
             %   S               A cell array or a table of time series vectors. Rows are repeats 
             %                   (e.g. trials); columns are different signals (e.g. neurons). 
+            %   ciArgs          Confidence interval-related Name-Value pairs supported by MMath.MeanStats.
+            %                   Use 'help MMath.MeanStats' for details.
             % Outputs
             %   mm              An array of mean time series. Rows are samples and columns are for 
             %                   different signals. 
-            %   ee              Standard error of elements in mm. 
+            %   ee              Standard error or CI of elements in mm. 
             %   stats           A table with the following variables.
             %     colNum          Column index of each signal in T.
             %     pkIdx           Index of the time bin where each trace in mm peaks.
             %     pkVal           The value at pkIdx.
+            %     pkProb          For consistency with MNeuro.MeanEventRate output format. All values are NaN.
             %     AUC             Area under the curve (i.e. the integral of each trace in mm). 
             %     entropy         Shannon's entropy of each trace in mm.
             
@@ -449,9 +484,9 @@ classdef MNeuro
                 % Concatenate rows
                 s = cell2mat(S(:,i));
                 
-                % Compute mean and sem
-                if exist('ciArgs', 'var')
-                    [m, ~, ~, e] = MMath.MeanStats(s, ciArgs{:});
+                % Compute mean and error
+                if numel(varargin) > 0
+                    [m, ~, ~, e] = MMath.MeanStats(s, varargin{:});
                 else
                     [m, ~, e] = MMath.MeanStats(s);
                 end
@@ -467,6 +502,7 @@ classdef MNeuro
             stats.colNum = (1:size(S,2))';
             stats.pkIdx = pkIdx';
             stats.pkVal = pkVal';
+            stats.pkProb = NaN(size(pkVal'));
             stats.AUC = sum(mm)';
             stats.entropy = I';
         end
