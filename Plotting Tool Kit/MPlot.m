@@ -12,7 +12,14 @@ classdef MPlot
                 case 0
                     ax = axes();
                 case 1
-                    ax = varargin{1};
+                    h = varargin{1};
+                    if isa(h, 'matlab.graphics.axis.Axes')
+                        ax = h;
+                    elseif isa(h, 'matlab.ui.Figure')
+                        ax = axes(h);
+                    else
+                        error('The input must be an axes or a figure handle.');
+                    end
                 case 3
                     ax = subplot(varargin{:});
             end
@@ -132,6 +139,7 @@ classdef MPlot
             %   MPlot.ErrorShade(..., 'Orientation', 'vertical')
             %   MPlot.ErrorShade(..., 'Color', 'k')
             %   MPlot.ErrorShade(..., 'Alpha', 0.15)
+            %   MPlot.ErrorShade(..., 'Parent', gca)
             %
             % Inputs:
             %   x               X-coordinates. Default is indices of elements in y. 
@@ -144,6 +152,7 @@ classdef MPlot
             %                   and 'horizontal' for X-axis.
             %   'Color'         Color of the shade. Default is black. 
             %   'Alpha'         Transparancy of the shade. Default 0.3. 
+            %   'Parent'        The axes to plot in. Default is the current axes returned by gca.
             %
             
             % Handles user inputs
@@ -156,6 +165,7 @@ classdef MPlot
             p.addParameter('Color', 'k');
             p.addParameter('Alpha', 0.15, @isnumeric);
             p.addParameter('Orientation', 'vertical', @(x) any(strcmp(x, {'vertical', 'horizontal'})));
+            p.addParameter('Parent', [], @(x) isa(x, 'matlab.graphics.axis.Axes'));
             
             p.parse(varargin{:});
             arg1 = p.Results.arg1;
@@ -178,16 +188,22 @@ classdef MPlot
                 errPos = arg2;
                 errNeg = arg2;
             end
-            isRelative = p.Results.IsRelative;
-            color = p.Results.Color;
-            faceAlpha = p.Results.Alpha;
-            ori = p.Results.Orientation;
             
             if isvector(y)
                 x = x(:);
                 y = y(:);
                 errPos = errPos(:);
                 errNeg = errNeg(:);
+            end
+            
+            isRelative = p.Results.IsRelative;
+            color = p.Results.Color;
+            faceAlpha = p.Results.Alpha;
+            ori = p.Results.Orientation;
+            ax = p.Results.Parent;
+            
+            if isempty(ax)
+                ax = gca;
             end
             
             % Ploting
@@ -199,9 +215,9 @@ classdef MPlot
                     err = [errPos(:,k); flip(errNeg(:,k))];
                 end
                 if strcmp(ori, 'vertical')
-                    patch(x, err, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                    patch(ax, x, err, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
                 else
-                    patch(err, x, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
+                    patch(ax, err, x, color, 'FaceAlpha', faceAlpha, 'LineStyle', 'none');
                 end
             end
         end
