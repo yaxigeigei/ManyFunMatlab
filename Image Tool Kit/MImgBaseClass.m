@@ -328,6 +328,61 @@ classdef MImgBaseClass
             comboStack = [ yProj, ones(imgSlices, imgSlices, numStacks); zProj, xProj ];
         end
         
+        function [img, affObj] = Transform(img, varargin)
+            % Translate, rotate, scale, and crop an image, in this order
+            %
+            %   [img, affObj] = Transform(img)
+            %   [img, affObj] = Transform(img, affObj)
+            %   [img, affObj] = Transform(..., 'Translate', [0 0])
+            %   [img, affObj] = Transform(..., 'Rotate', 0)
+            %   [img, affObj] = Transform(..., 'Scale', [1 1])
+            %   [img, affObj] = Transform(..., 'Crop', size(img))
+            %
+            % Inputs:
+            %   img             A grayscle image, an RGB image, or a stack (in the 4th dim) of RGB images.
+            %   affObj          An affine2d object to transform img.
+            %   'Translate'     Two-element vector for the pixels to translate in x and y direction.
+            %   'Rotate'        Degree to rotate. Positive is clockwise.
+            %   'Scale'         Two-element vector for the scaling factors in x and y direction.
+            %   'Crop'          Two-element vector of the output image size.
+            % Outputs:
+            %   img             Transformed image.
+            %   affObj          The affine2d object that implements the transformation and has relevant
+            %                   information. It can also be used for inverse transformation.
+            
+            p = inputParser();
+            p.addOptional('affObj', [], @(x) isa(x, 'affine2d'));
+            p.addParameter('Translate', [0 0], @(x) isnumeric(x) && numel(x)==2);
+            p.addParameter('Rotate', 0, @(x) isnumeric(x) && isscalar(x));
+            p.addParameter('Scale', [1 1], @(x) isnumeric(x) && numel(x)==2);
+            p.addParameter('Crop', size(img), @(x) isnumeric(x) && numel(x)==2);
+            p.parse(varargin{:});
+            affObj = p.Results.affObj;
+            a = p.Results.Rotate;
+            sx = p.Results.Scale(1);
+            sy = p.Results.Scale(2);
+            tx = p.Results.Translate(1);
+            ty = p.Results.Translate(2);
+            cr = p.Results.Crop(1:2);
+            
+            if isempty(affObj)
+                sz = size(img);
+                sz = sz(1:2);
+                dCenter = flip((sz-1)/2);
+                dCr = flip((cr-sz)/2);
+                
+                centerMat = [1 0 0; 0 1 0; -dCenter 1];
+                transMat = [1 0 0; 0 1 0; tx ty 1];
+                rotateMat = [cosd(a) sind(a) 0; -sind(a) cosd(a) 0; 0 0 1];
+                scaleMat = [sx 0 0; 0 sy 0; 0 0 1];
+                resetMat = [1 0 0; 0 1 0; dCenter+dCr 1];
+                affObj = affine2d(centerMat*transMat*rotateMat*scaleMat*resetMat);
+            end
+            
+            refObj = imref2d(cr);
+            img = imwarp(img, affObj, 'OutputView', refObj);
+        end
+        
         function Viewer(img, varargin)
             % Display image, image stack or stacks in a figure-based viewer for easy browsing
             %
