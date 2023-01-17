@@ -235,16 +235,34 @@ classdef MPlotter < handle
         
         function SetEpoch(this, epoch)
             % Programatically change the current epoch
+            % 
+            %   mp.SetEpoch(epoch)
+            % 
+            %   mp          MPlotter object.
+            %   epoch       The index of the epoch to go to.
+            % 
             this.UpdateRoutine('epoch', epoch);
         end
         
         function SetTime(this, time)
             % Programatically change the current time
+            % 
+            %   mp.SetTime(time)
+            % 
+            %   mp          MPlotter object.
+            %   time        The time value to go to.
+            % 
             this.UpdateRoutine('time', time);
         end
         
         function SetTimeLimits(this, lims)
             % Programatically change the time limits
+            % 
+            %   mp.SetTimeLimits(lims)
+            % 
+            %   mp          MPlotter object.
+            %   lims        Two-element numeric vector of the time limits.
+            % 
             this.gui.limitEdit1.String = num2str(lims(1));
             this.gui.limitEdit2.String = num2str(lims(2));
             this.UpdateRoutine('time');
@@ -254,20 +272,23 @@ classdef MPlotter < handle
             % Generate video from a figure window and optionally save to a video file.
             % The start and end times are determined by the time limit text boxes.
             % 
-            %   frames = MakeVideo(fig, dTime)
-            %   frames = MakeVideo(..., 'filePath', [], 'frameRate', [])
+            %   frames = mp.MakeVideo(fig, dTime)
+            %   frames = mp.MakeVideo(..., 'filePath', [], 'frameRate', [])
             % 
             % Inputs
-            %   fig             A figure handle.
+            %   mp              MPlotter object.
+            %   fig             One or a vector of figure handle(s).
             %   dTime           The amount of time increment in second for the animation. This is 
             %                   the time in data, not for video playback.
-            %   'FilePath'      The file path to save.
+            %   'FilePath'      The file path(s) to save at. The numnber of paths should match the number
+            %                   of handles in fig.
             %   'FrameRate'     The frame rate of the saved video file. This together with dTime controls
             %                   the speed of playback.
             % Output
             %   frames          A height-by-width-by-frames-by-RGB array of video frames.
             %                   A video file is save only when both 'filePath' and 'frameRate' are 
             %                   specified, but vidMat is always returned.
+            % 
             
             % Handle user inputs
             p = inputParser();

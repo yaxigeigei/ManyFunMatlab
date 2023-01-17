@@ -593,6 +593,129 @@ classdef MPlot
             end
         end
         
+        function PlotRasterStack(spk, varargin)
+            % Plot rasters from a spikeTime table (or its cell array) in one axes with stacking units
+            
+            p = inputParser();
+            p.addParameter('Color', [], @(x) true);
+            p.addParameter('MarkUnits', [], @isnumeric);
+            p.addParameter('MarkTrials', [], @isnumeric);
+            p.addParameter('Parent', [], @(x) isa(x, 'matlab.graphics.axis.Axes'));
+            p.parse(varargin{:});
+            unit_c = p.Results.Color;
+            indMU = p.Results.MarkUnits;
+            indMT = p.Results.MarkTrials;
+            ax = p.Results.Parent;
+            
+            if istable(spk)
+                spk = spk{:,:};
+            end
+            [n_trials, n_units] = size(spk);
+            
+            if isempty(ax)
+                ax = gca;
+            end
+            
+            % Determine colors
+            if isempty(unit_c)
+                unit_c = repmat([0 0 0 .7; .3 .3 .3 .7], [ceil(n_units/2) 1]);
+            end
+            if ~isempty(indMU)
+                unit_c(indMU,:) = [.8 0 0 1]; % hightlight selected histograms in red
+            end
+            
+            hold(ax, 'on');
+            m = 0;
+            y = 0.5;
+            
+            for i = 1 : n_units
+                m = m + 1;
+                y = y + 1/(n_trials+2);
+                
+                for j = 1 : n_trials
+                    y = y + 1/(n_trials+2);
+                    
+                    spk_t = spk{j,i};
+                    spk_y = repelem(y,length(spk_t));
+                    spk_h = 1/(n_trials+2) * .8;
+                    
+                    if ~ismember(j, indMT)
+                        MPlot.PlotPointAsLine(spk_t, spk_y, spk_h, 'Color', unit_c(m,:), 'LineWidth', .5, 'Parent', ax);
+                    else
+                        MPlot.PlotPointAsLine(spk_t, spk_y, spk_h, 'Color', [.8 0 0 1], 'LineWidth', .5, 'Parent', ax);
+                    end
+                end
+                
+                y = y + 1/(n_trials+2);
+            end
+            
+            ax.YLim = [.5, n_units+.5];
+            ax.YTick = 1 : n_units;
+            ax.YDir = 'reverse';
+            ax.XGrid = 'on';
+%             ax.XMinorGrid = 'on';
+        end
+        
+        function PlotHistStack(t, hh, ee, varargin)
+            % Plot a stack of histograms in one axes
+            
+            p = inputParser();
+            p.addParameter('Scaling', 1, @(x) isnumeric(x) && isscalar(x));
+            p.addParameter('Style', 'trace', @(x) ismember(x, {'trace', 'bar'}));
+            p.addParameter('MarkUnits', [], @isnumeric);
+            p.addParameter('Parent', [], @(x) isa(x, 'matlab.graphics.axis.Axes'));
+            p.parse(varargin{:});
+            frac = p.Results.Scaling;
+            style = p.Results.Style;
+            indMk = p.Results.MarkUnits;
+            ax = p.Results.Parent;
+            
+            if isempty(ax)
+                ax = gca;
+            end
+            
+            % Scale heights
+            hh = hh * frac;
+            ee = ee * frac;
+            
+            % Determine colors
+            n_units = size(hh, 2);
+            unit_c = repmat({[0 0 0], [0 0 0]+.3}, [1 ceil(n_units/2)]);
+            unit_c(indMk) = {[.8 0 0]}; % hightlight selected histograms in red
+            
+            % Prepare bins for bar plots
+            binSize = t(2) - t(1);
+            binEdges = t - binSize/2;
+            binEdges(end+1) = binEdges(end) + binSize;
+            
+            % Plotting
+            m = 0;
+            y = 0.5;
+            hold(ax, 'on');
+            
+            for i = 1 : n_units
+                m = m + 1;
+                switch style
+                    case 'bar'
+                        px = repelem(binEdges, 2);
+                        py = [0 repelem(hh(:,i)',2) 0];
+                        patch(ax, px, -py+y+1, unit_c{m}, 'FaceAlpha', .1, 'EdgeColor', 'none');
+                    case 'trace'
+                        plot(ax, t, -hh(:,i)+y+1, 'Color', [unit_c{m} .5], 'LineWidth', 1);
+                        MPlot.ErrorShade(t, -hh(:,i)+y+1, ee(:,i), 'Alpha', 0.1, 'Parent', ax);
+                    otherwise
+                        error('%s is not a supported style', style);
+                end
+                y = y + 1;
+            end
+            
+            ax.YLim = [.5, n_units+.5];
+            ax.YTick = 1 : n_units;
+            ax.YDir = 'reverse';
+            ax.XGrid = 'on';
+%             ax.XMinorGrid = 'on';
+        end
+        
         function varargout = PlotTraceLadder(varargin)
             % Plot traces as a ladder
             % 
@@ -604,12 +727,12 @@ classdef MPlot
             %   hh = MPlot.PlotTraceLadder(...)
             % 
             % Inputs
-            %   yy                  1) A numeric vector of y coordinates that plots one trace.
-            %                       2) A matrix whose columns are 1).
-            %                       3) A cell array of 1). Vectors do not need to have the same length.
+            %   yy                  1) A numeric vector of y coordinates for a single trace.
+            %                       2) A matrix where each column is (1).
+            %                       3) A cell array of (1). Vectors do not need to have the same length.
             %   xx                  1) A vector of x coordinates that applies to all series in yy.
-            %                       2) A matrix of 1) as columns for individual series in yy.
-            %                       3) A cell array of 1) for individual series in yy.
+            %                       2) A matrix of (1) as columns for individual series in yy.
+            %                       3) A cell array of (1) for individual series in yy.
             %                       4) An empty array []. Use sample indices as x coordinates. 
             %   yPos                Y position of each trace's zero after shifting them into a ladder. 
             %   'ColorArray'        1) An n-by-3 array of RGB colors. 
@@ -674,7 +797,9 @@ classdef MPlot
             
             % Format yPos
             if isempty(yPos)
-                yPos = cumsum(-min(yy) + [0, max(yy(:,1:end-1))]);
+                dyPos = -min(yy) + [0, max(yy(:,1:end-1))];
+                dyPos(isnan(dyPos)) = median(dyPos, 'omitnan');
+                yPos = cumsum(dyPos);
             end
             yPos = yPos(:)';
             
