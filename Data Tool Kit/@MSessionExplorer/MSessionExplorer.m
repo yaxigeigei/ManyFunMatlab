@@ -191,7 +191,7 @@ classdef MSessionExplorer < handle
             %   se = Merge(se1, se2, se3, ...)
             % 
             % Inputs
-            %   se1, se2, se3, ...      Arbitrary number of MSessionExplorer objects. 
+            %   se1, se2, se3, ...      Arbitrary number of MSessionExplorer objects or object arrays
             % Output
             %   se                      The merged MSessionExplorer object
             
@@ -208,12 +208,17 @@ classdef MSessionExplorer < handle
             
             % Concatenate and set each table
             for i = 1 : numel(this.tableNames)
+                % Get all tables of the same name
                 tbName = this.tableNames{i};
-                tbData = arrayfun(@(x) x.GetTable(tbName), seArray, 'Uni', false);
-                tbData = cat(1, tbData{:});
+                tbs = arrayfun(@(x) x.GetTable(tbName), seArray, 'Uni', false);
+                
+                % Concatenation
+                tbCat = this.ICatTables(tbs, this.isTimesSeriesTable(i));
+                
+                % Set table to merged se
                 refTime = arrayfun(@(x) x.GetReferenceTime(tbName), seArray, 'Uni', false);
                 refTime = cat(1, refTime{:});
-                se.SetTable(tbName, tbData, this.tot.tableType{i}, refTime);
+                se.SetTable(tbName, tbCat, this.tot.tableType{i}, refTime);
             end
             
             % Add incremented epoch indices
@@ -222,13 +227,19 @@ classdef MSessionExplorer < handle
             epInd(2:end) = cellfun(@(x,y) x + y, num2cell(cumNumEp(1:end-1)), epInd(2:end), 'Uni', false);
             se.epochInd = cat(1, epInd{:});
             
-            % Add user data
-            se.userData = arrayfun(@(x) x.userData, seArray, 'Uni', false);
-            try
-                se.userData = cat(1, se.userData{:});
-            catch
-                warning('Not all userData have the same fields thus were stored into a cell array');
+            % Add all userdata in a struct array, filling any missing fields with []
+            ud = arrayfun(@(x) x.userData, seArray, 'Uni', false);
+            fdNames = cellfun(@fieldnames, ud, 'Uni', false);
+            uniFdNames = unique(cat(1, fdNames{:}), 'stable');
+            for i = 1 : numel(ud)
+                for j = 1 : numel(uniFdNames)
+                    fn = uniFdNames{j};
+                    if ~isfield(ud{i}, fn)
+                        ud{i}.(fn) = [];
+                    end
+                end
             end
+            se.userData = cat(1, ud{:});
         end
         
         function s = ToStruct(this)
@@ -435,7 +446,7 @@ classdef MSessionExplorer < handle
         function colData = GetColumn(this, tbName, colIDs)
             % Return specific columns from a data table
             %
-            %   colData = GetColumn(tbName, colNames)
+            %   colData = GetColumn(tbName, colIDs)
             %
             % Inputs
             %   tbName          The name of a table that contains the columns of interest. 
@@ -502,6 +513,37 @@ classdef MSessionExplorer < handle
             else
                 % Set values
                 tb{:,colIDs} = colData;
+            end
+            
+            this.tot{tbName, 'tableData'}{1} = tb;
+        end
+        
+        function Column2Cell(this, tbName, colIDs)
+            % Force columns to be cell arrays
+            %
+            %   Column2Cell(tbName)
+            %   Column2Cell(tbName, colIDs)
+            %
+            % Inputs
+            %   tbName          The name of a table that contains the columns of interest.
+            %   colIDs          1) Column name(s) as a string or a cell array of strings.
+            %                   2) Integer or logical indices of column.
+            %                   3) If this is not provided or empty, all columns will be included.
+            
+            this.IValidateTableName(tbName, true);
+            tb = this.tot{tbName, 'tableData'}{1};
+            
+            if nargin < 3 || isempty(colIDs)
+                colIDs = 1 : width(tb);
+            end
+            
+            colInd = this.IValidateColumnIndexing(tb, colIDs);
+            for k = 1 : numel(colInd)
+                C = tb.(colInd(k));
+                if ~iscell(C)
+                    C = num2cell(C);
+                end
+                tb.(colInd(k)) = C;
             end
             
             this.tot{tbName, 'tableData'}{1} = tb;
@@ -991,17 +1033,55 @@ classdef MSessionExplorer < handle
         end
         
         function C = ICatColumn(~, C, tRef)
-            if iscell(C)
-                % Cell vector of numeric array
-                if nargin > 2
-                    for i = 1 : numel(C)
-                        C{i} = C{i} + tRef(i);
-                    end
-                end
-                C = cat(1, C{:});
-            elseif nargin > 2
+            if nargin < 3
+                tRef = zeros(size(C));
+            end
+            if ~iscell(C)
                 % Numeric vector
                 C = C + tRef;
+            else
+                % Cell vector of numeric array
+                for i = 1 : numel(C)
+                    C{i} = C{i} + tRef(i);
+                end
+                C = cat(1, C{:});
+            end
+        end
+        
+        function tbCat = ICatTables(~, tbs, isTimeseries)
+            % Vertically concatenates tables and handles inconsistent column variable names.
+            % Each unique variable across tables will be a column in the concatenated table. 
+            % Missing parts will be filled with matching NaN arrays for timeseries tables 
+            % (i.e. isTimeseries == true), otherwise leaving automatic placeholder (e.g. []).
+            
+            if nargin < 3
+                isTimeseries = false;
+            end
+            
+            warning('off', 'MATLAB:table:RowsAddedExistingVars');
+            tbCat = table;
+            r = 0; % will store the end index of the last concatenated table
+            for i = 1 : numel(tbs)
+                vn = tbs{i}.Properties.VariableNames;
+                h = height(tbs{i});
+                for j = 1 : numel(vn)
+                    tbCat.(vn{j})(r+1:r+h) = tbs{i}.(vn{j});
+                end
+                r = r + h;
+            end
+            warning('on', 'MATLAB:table:RowsAddedExistingVars');
+            
+            if ~isTimeseries
+                return
+            end
+            nSp = cellfun(@numel, tbCat.time);
+            for c = 2 : width(tbCat)
+                nSig = max(cellfun(@(x) size(x,2), tbCat.(c)));
+                for r = 1 : height(tbCat)
+                    if isempty(tbCat.(c){r})
+                        tbCat.(c){r} = NaN(nSp(r), nSig);
+                    end
+                end
             end
         end
         
