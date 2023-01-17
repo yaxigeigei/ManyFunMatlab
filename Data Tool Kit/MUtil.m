@@ -13,6 +13,24 @@ classdef MUtil
             s = table2struct(cat(2, tbs{:}));
         end
         
+        function s = EvalFields(s)
+            % Evaluate and convert interpretable fields (e.g. numeric arrays) in the struct
+            % 
+            %   s = MUtil.EvalFields(s)
+            % 
+            if numel(s) > 1
+                arrayfun(@MUtil.EvalFields, s);
+            end
+            fn = fieldnames(s);
+            for i = 1 : numel(fn)
+                n = fn{i};
+                try
+                    s.(n) = eval(s.(n));
+                catch
+                end
+            end
+        end
+        
         function hit = MatchAnyRegExp(str, expressions)
             % Match any of the regular expressions
             % 
