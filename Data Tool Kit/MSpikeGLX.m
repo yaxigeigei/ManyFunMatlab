@@ -11,15 +11,17 @@ classdef MSpikeGLX
             if nargin < 1 || isempty(metaPath)
                 metaPath = MBrowse.File();
             end
+            metaPath = char(metaPath);
             [folderPath, baseName] = fileparts(metaPath);
             meta = MSpikeGLX.ReadMeta([baseName '.meta'], folderPath);
         end
         
-        function [meta, aiArray, diArray, t] = ReadNI(metaPath)
+        function [meta, aiArray, diArray, t] = ReadNI(niPath)
             % 
             
             % Read metadata
-            [folderPath, baseName] = fileparts(metaPath);
+            niPath = char(niPath);
+            [folderPath, baseName] = fileparts(niPath);
             meta = MSpikeGLX.ReadMeta([baseName '.meta'], folderPath);
             
             % Read timeseries
@@ -49,11 +51,12 @@ classdef MSpikeGLX
             end
         end
         
-        function [meta, lfpArray, t] = ReadLFP(metaPath)
+        function [meta, lfpArray, t] = ReadLFP(lfPath)
             % 
             
             % Read metadata
-            [folderPath, baseName] = fileparts(metaPath);
+            lfPath = char(lfPath);
+            [folderPath, baseName] = fileparts(lfPath);
             meta = MSpikeGLX.ReadMeta([baseName '.meta'], folderPath);
             
             % Read timeseries
