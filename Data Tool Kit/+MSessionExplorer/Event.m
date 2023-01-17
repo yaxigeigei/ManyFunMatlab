@@ -1,6 +1,23 @@
 classdef Event
-    % MSessionExplorer.Event binds times and values of an event together and works like a numeric event 
-    % time in eventTimes table of MSessionExplorer objects
+    % MSessionExplorer.Event objects work just like numeric values, thus can undergo
+    % numeric operations and be used in eventTimes table of MSessionExplorer objects. 
+    % Unlike simple numbers, however, these objects can carry additional timestamps 
+    % and attributes of the events, and keep all times consistent under operations.
+    %
+    %   obj = MSessionExplorer.Event()
+    %   obj = MSessionExplorer.Event(t)
+    %   obj = MSessionExplorer.Event(t, T)
+    %   obj = MSessionExplorer.Event(t, T, V)
+    %
+    % Inputs
+    %   t       One or a vector of event timestamps.
+    %   T       One or a vector of structs containing associated event times.
+    %           T must have the same number of elements as t.
+    %   V       One or a vector of structs containing associated event values.
+    %           V must have the same number of elements as t.
+    % Output
+    %   obj     One or a vector of MSessionExplorer.Event objects.
+    % 
     
     properties(Dependent)
         t;  % Primary timestamp of this object
@@ -15,22 +32,23 @@ classdef Event
     end
     
     methods
-        function this = Event(t, T, V)
-            % MSessionExplorer.Event constructs an instance of this class
-            %
-            %   obj = MSessionExplorer.Event()
-            %   obj = MSessionExplorer.Event(t)
-            %   obj = MSessionExplorer.Event(t, T)
-            %   obj = MSessionExplorer.Event(t, T, V)
-            %
-            if nargin > 0
-                this.t = t;
+        function obj = Event(t, T, V)
+            % See class documentation above for the use of the constructor
+            
+            % This allow for constructing object array
+            if nargin == 0
+                return
             end
-            if nargin > 1
-                this.T = T;
-            end
-            if nargin > 2
-                this.V = V;
+            
+            % Add values to object
+            for i = numel(t) : -1 : 1
+                obj(i,1).t = t(i);
+                if nargin > 1 && numel(T) == numel(t)
+                    obj(i,1).T = T(i);
+                end
+                if nargin > 2 && numel(V) == numel(t)
+                    obj(i,1).V = V(i);
+                end
             end
         end
         
@@ -132,7 +150,7 @@ classdef Event
             % Inputs
             %   fieldName       Name of the field to return.
             %   isCat           By default, field values are returned in a cell array unless all values
-            %                   are scalar or there is only one object. Setting isCat to true force 
+            %                   are scalar or there is only one object. Setting isCat to true forces 
             %                   concatenating the cell array, whereas false retains it. 
             % Output
             %   val             Returned values. 
@@ -150,7 +168,32 @@ classdef Event
             end
         end
         
+        % Special Modifiers
+        function obj = Morph(obj, mdl)
+            % Allows a model to transform timestamps in t and T
+            % 
+            %   obj = Morph(obj, mdl)
+            % 
+            % Input
+            %   mdl         Any object or function supporting the syntax "tNew = mdl(tOld)".
+            % Output
+            %   obj         Objects with transformed time.
+            % 
+            for i = 1 : numel(obj)
+                obj(i).t = mdl(obj(i).t);
+                obj(i).T = structfun(@(x) mdl(x), obj(i).T, 'Uni', false);
+            end
+        end
+        
         % Function Overloading
+        function obj = round(obj, varargin)
+            % Round timestamp variables including t and fields in T
+            % It follows the same input and output convention as MATLAB's round function. 
+            for i = 1 : numel(obj)
+                obj(i).t = round(obj(i).t, varargin{:});
+                obj(i).T = structfun(@(x) round(x, varargin{:}), obj(i).T, 'Uni', false);
+            end
+        end
         function val = double(this)
             % Return t properties of an object array in double
             val = double(this.IGet_t());
@@ -170,7 +213,7 @@ classdef Event
         end
         function [this, ind] = sort(this, varargin)
             % Sorting elements in object array based on t property
-            % It uses the same inputs and outputs as MATLAB sort function. 
+            % It follows the same input and output convention as MATLAB's sort function. 
             [~, ind] = sort(this.IGet_t(), varargin{:});
             this = this(ind);
         end
@@ -262,7 +305,7 @@ classdef Event
             if isscalar(val)
                 val = repmat(val, size(this));
             end
-            assert(all(size(this) == size(val)), 'Size of the object and numeric array does not agree');
+            assert(all(size(this) == size(val)), 'Size of the object and the numeric array does not agree');
             for i = 1 : numel(this)
                 this(i).t_ = this(i).t_ + val(i);
                 this(i).T_ = structfun(@(x) x + val(i), this(i).T_, 'Uni', false);
@@ -272,7 +315,7 @@ classdef Event
             if isscalar(val)
                 val = repmat(val, size(this));
             end
-            assert(all(size(this) == size(val)), 'Size of the object and numeric array does not agree');
+            assert(all(size(this) == size(val)), 'Size of the object and the numeric array does not agree');
             for i = 1 : numel(this)
                 this(i).t_ = this(i).t .* val(i);
                 this(i).T_ = structfun(@(x) x .* val(i), this(i).T_, 'Uni', false);
