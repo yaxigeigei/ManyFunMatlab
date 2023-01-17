@@ -2,6 +2,42 @@ classdef MMath
     % MMath is a collection of functions useful for doing math and manipulating data
     
     methods(Static)
+        function edges = BinCenters2Edges(centers)
+            % Convert bin centers to bin edges
+            % 
+            %   edges = BinCenters2Edges(centers)
+            % 
+            % Input
+            %   centers             A numeric vector of n bin centers. n must be > 1.
+            % Output
+            %   edges               A numeric vector of n+1 bin edges
+            % 
+            assert(numel(centers) > 1, "Must provide more than one bin centers to derive the edges.");
+            isCol = iscolumn(centers);
+            if isCol
+                centers = centers';
+            end
+            hw = diff(centers) / 2;
+            edges = [centers(1)-hw(1), centers(2:end)-hw, centers(end)+hw(end)];
+            if isCol
+                edges = edges';
+            end
+        end
+        
+        function centers = BinEdges2Centers(edges)
+            % Convert bin edges to bin centers
+            % 
+            %   centers = BinEdges2Centers(edges)
+            % 
+            % Input
+            %   edges               A numeric vector of n bin edges. n must be > 1.
+            % Output
+            %   centers             A numeric vector of n-1 bin centers.
+            % 
+            assert(numel(edges) > 1, "Must provide more than one bin edges to derive the centers.");
+            centers = edges(2:end) - diff(edges)/2;
+        end
+        
         function [ci, bootstat] = BootCI(nboot, bootfun, varargin)
             % Bootstraps confidence interval as the built-in bootci function but supports hierarchical bootstrap
             %
@@ -822,12 +858,57 @@ classdef MMath
             r2adj = 1 - (n-1)/(n-p) * SSE./TSS;
         end
         
+        function rsM = RepShiftMat(M, K, varargin)
+            % Shift element positions in an array along the first dimension
+            % 
+            %   rsM = RepShiftMat(M, K)
+            %   rsM = RepShiftMat(M, K, fillVal)
+            %   rsM = RepShiftMat(..., 'CellOutput', false)
+            % 
+            % Inputs
+            %   M               Matrix to replicate and shift.
+            %   K               A vector of the indices to shift by. The size of this vector, size(K), 
+            %                   determines how the replicated matrices will be arranged. 
+            %   fillVal         What value to fill when elements are shifted away.
+            %   'CellOutput'    Whether to output individual replicated and shifted matrices in cell 
+            %                   array. Default is false where cell array will be denested into a single 
+            %                   numeric array.
+            % Output
+            %   rsM             Replicated and shifted matrix.
+            % 
+            
+            p = inputParser();
+            p.addOptional('fillVal', NaN, @(x) isnumeric(x) && isscalar(x));
+            p.addParameter('CellOutput', false, @islogical);
+            p.parse(varargin{:});
+            fillVal = p.Results.fillVal;
+            isCell = p.Results.CellOutput;
+            
+            nRow = size(M, 1);
+            ind = (1:nRow)' + K(:)';
+            isOOB = ind < 1 | ind > nRow; % find out-of-bond indices
+            ind(isOOB) = 1; % make indices legal
+            
+            rsM = cell(size(K));
+            for k = 1 : numel(K)
+                rsM{k} = M(ind(:,k), :);
+                rsM{k}(isOOB(:,k), :) = fillVal;
+            end
+            
+            if ~isCell
+                rsM = cell2mat(rsM);
+            end
+        end
+        
         function [a, I] = SortLike(a, b)
-            % Sort elements in 'a' as how these elements are ordered in 'b'
+            % Sort elements in 'a' like how they are ordered in 'b'
+            %
+            %   [a, I] = MMath.SortLike(a, b)
+            %
             b = b(ismember(b, a));
             I = zeros(size(a));
             for i = 1 : numel(a)
-                I(i) = find(a==b(i));
+                I(i) = find(a==b(i), 1);
             end
             a = a(I);
         end
