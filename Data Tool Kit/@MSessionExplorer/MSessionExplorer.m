@@ -27,31 +27,31 @@ classdef MSessionExplorer < handle
     % See also MSessionExplorer.Event, MPlot, MPlotter, MMath
     
     properties(Constant)
-        supportedTableTypes = ... % 'eventTimes', 'eventValues', 'timeSeries' (read-only)
+        supportedTableTypes = ...   % 'eventTimes', 'eventValues', 'timeSeries' (read-only)
             {'eventTimes', 'eventValues', 'timeSeries'};
     end
     properties(GetAccess = public, SetAccess = private)
-        tot;                    % A table of data tables, reference times and related metadata (read-only)
+        tot                         % A table of data tables, reference times and related metadata (read-only)
     end
     properties
-        userData;               % A struct where user stores arbitrary data
+        userData                    % A struct where user stores arbitrary data
     end
     properties(Dependent)
-        tableNames;             % A cell array of table names (read-only)
-        isEventTimesTable;      % Whether each table is eventTimes table (read-only)
-        isEventValuesTable;     % Whether each table is eventValues table (read-only)
-        isTimesSeriesTable;     % Whether each table is timeSeries table (read-only)
-        numEpochs;              % The number of epochs (read-only)
+        tableNames                  % A cell array of table names (read-only)
+        isEventTimesTable           % Whether each table is eventTimes table (read-only)
+        isEventValuesTable          % Whether each table is eventValues table (read-only)
+        isTimesSeriesTable          % Whether each table is timeSeries table (read-only)
+        numEpochs                   % The number of epochs (read-only)
     end
     properties
-        epochInd;               % Indices of epoch
-        isVerbose = true;       % Whether or not to display progress and some warnings
+        epochInd                    % Indices of epoch
+        isVerbose logical = true    % Whether or not to display progress and some warnings
     end
     properties(Access = private)
-        originalTrialInd;       % for backward compatibility
+        originalTrialInd            % for backward compatibility
     end
     properties(Dependent, Hidden)
-        numTrials;              % for backward compatibility
+        numTrials                   % for backward compatibility
     end
     
     % These methods are exposed to users
@@ -137,7 +137,7 @@ classdef MSessionExplorer < handle
         end
         
         function se = Duplicate(this, varargin)
-            % Make a deep copy of the current object
+            % Make a hard copy of the current object
             % 
             %   se = Duplicate()
             %   se = Duplicate(tbNames)
@@ -229,6 +229,12 @@ classdef MSessionExplorer < handle
             
             % Add all userdata in a struct array, filling any missing fields with []
             ud = arrayfun(@(x) x.userData, seArray, 'Uni', false);
+            isEptUd = cellfun(@isempty, ud);
+            if all(isEptUd)
+                return
+            else
+                ud(isEptUd) = repmat({struct}, sum(isEptUd));
+            end
             fdNames = cellfun(@fieldnames, ud, 'Uni', false);
             uniFdNames = unique(cat(1, fdNames{:}), 'stable');
             for i = 1 : numel(ud)
@@ -240,6 +246,63 @@ classdef MSessionExplorer < handle
                 end
             end
             se.userData = cat(1, ud{:});
+        end
+        
+        function seArray = Split(this, epochArg, isSplitUserData)
+            % Split epochs of a MSessionExplorer object to individual objects
+            % 
+            %   seArray = Split(epochDist)
+            %   seArray = Split(epochInd)
+            %   seArray = Split(..., isSplitUserData)
+            % 
+            % Inputs
+            %   epochDist       An n-element numeric vector for the numbers of epochs to split. 
+            %                   This is similar to rowDist in MATLAB's mat2cell function.
+            %   epochInd        A cell array of 
+            % Output
+            %   seArray         A vector of MSessionExplorer objects.
+            %
+            % See also mat2cell
+            
+            if nargin < 3
+                isSplitUserData = true;
+            end
+            
+            % Convert epochDist to epochInd
+            if isnumeric(epochArg)
+                epDist = epochArg(:);
+                epB = cumsum(epDist);
+                epA = [0; epB(1:end-1)] + 1;
+                epInd = arrayfun(@(a,b) (a:b)', epA, epB, 'Uni', false);
+            end
+            
+            % Initialize se objects with userData
+            for k = numel(epInd) : -1 : 1
+                seArray(k) = MSessionExplorer();
+                seArray(k).isVerbose = this.isVerbose;
+                if isSplitUserData && numel(this.userData) == numel(epInd)
+                    seArray(k).userData = this.userData(k);
+                else
+                    seArray(k).userData = this.userData;
+                end
+            end
+            
+            % Add tables
+            for i = 1 : numel(this.tableNames)
+                tbName = this.tableNames{i};
+                tb = this.GetTable(tbName);
+                rt = this.GetReferenceTime(tbName);
+                for k = 1 : numel(seArray)
+                    m = epInd{k};
+                    if isempty(rt)
+                        seArray(k).SetTable(tbName, tb(m,:), this.tot.tableType{i});
+                    else
+                        seArray(k).SetTable(tbName, tb(m,:), this.tot.tableType{i}, rt(m));
+                    end
+                end
+            end
+            
+            seArray = reshape(seArray, size(epochArg));
         end
         
         function s = ToStruct(this)
@@ -747,6 +810,7 @@ classdef MSessionExplorer < handle
             %   tbOut = ResampleTimeSeries(tbIn, tEdges, rowInd, colInd)
             %   tbOut = ResampleTimeSeries(..., 'Method', 'linear')
             %   tbOut = ResampleTimeSeries(..., 'Method', 'linear', 'Extrapolation', 'none')
+            %   tbOut = ResampleTimeSeries(..., 'Antialiasing', false)
             % 
             % Inputs
             %   tbIn            A table of time series data or a name of a timeSeries table in the current object.
@@ -762,6 +826,12 @@ classdef MSessionExplorer < handle
             %   'Method' and 'Extrapolation'
             %                   Use these Name-Value pairs to customize the behavior of interpolation. Please see 
             %                   options of the MATLAB griddedInterpolant function for details. 
+            %   'Antialiasing'  Whether or not to resample with antialiasing filters (default is false). 
+            %                   If tEdges do not have uniform bin sizes, the antialiasing targets the frequency 
+            %                   determined by the smallest bin size. 
+            %                   Antialiasing is always ignored when upsampling, or (in the case of non-uniform 
+            %                   sampling) when the largest bin size of the query is smaller than the smallest 
+            %                   sample duration of the timeseries to be resampled.
             % Output
             %   tbOut           The output table of time series data where each value is the number of occurance. 
             %
@@ -775,11 +845,13 @@ classdef MSessionExplorer < handle
             p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
             p.addParameter('Method', 'linear');
             p.addParameter('Extrapolation', 'none');
+            p.addParameter('Antialiasing', false, @islogical);
             p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
             colInd = p.Results.colInd;
             interpMethod = p.Results.Method;
             extrapMethod = p.Results.Extrapolation;
+            isAA = p.Results.Antialiasing;
             
             % Get table
             if ~istable(tbIn)
@@ -796,18 +868,38 @@ classdef MSessionExplorer < handle
             % Validate and standardize time edges
             tEdges = this.IValidateTimeEdges(tEdges, height(tbIn), rowInd);
             
-            % Interpolate time series
-            tbOut = tbIn(rowInd, colInd);
+            % Select rows and columns
+            tbIn = tbIn(rowInd, colInd);
             tEdges = tEdges(rowInd);
-            for i = 1 : height(tbOut)
-                t = tbOut.time{i};
+            
+            % Interpolate time series
+            tbOut = tbIn;
+            for i = 1 : height(tbIn)
+                % Get timestamps
+                t = tbIn.time{i};
                 tq = tEdges{i}(1:end-1) + diff(tEdges{i})/2;
                 tbOut.time{i} = tq;
-                for j = 2 : width(tbOut)
-                    v = tbOut.(j){i};
+                
+                if isAA && numel(t) > 1
+                    % Find input and query sampling frequency for antialiasing
+                    maxFs = 1 / min(diff(t));
+                    minFsq = 1 / max(diff(tEdges{i}));
+                end
+                
+                for j = 2 : width(tbIn)
+                    t = tbIn.time{i};
+                    v = tbIn.(j){i};
                     dtype = class(v);
+                    
+                    % Antialiasing
+                    if isAA && sum(~isnan(v)) > 1 && minFsq < maxFs
+                        [v, t] = resample(double(v), t, minFsq, 'Dimension', 1);
+                    end
+                    
+                    % Interpolation
                     F = griddedInterpolant(t, double(v), interpMethod, extrapMethod);
                     v = F(tq);
+                    
                     tbOut.(j){i} = cast(v, dtype);
                 end
             end
@@ -887,6 +979,7 @@ classdef MSessionExplorer < handle
         
         tbOut = SliceTimeSeries(this, tbIn, tWin, varargin)
         tbOut = SliceEventTimes(this, tbIn, tWin, varargin)
+        items = Plot(this, varargin)
     end
     methods(Static)
         [tb, preTb] = MakeTimeSeriesTable(t, s, varargin)
@@ -1065,7 +1158,7 @@ classdef MSessionExplorer < handle
                 vn = tbs{i}.Properties.VariableNames;
                 h = height(tbs{i});
                 for j = 1 : numel(vn)
-                    tbCat.(vn{j})(r+1:r+h) = tbs{i}.(vn{j});
+                    tbCat.(vn{j})(r+1:r+h) = tbs{i}.(vn{j}); % currently cannot assign inconsistent data type
                 end
                 r = r + h;
             end
