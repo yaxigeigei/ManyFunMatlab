@@ -356,8 +356,9 @@ classdef MMath
             %   H           Entropy in bits
             
             probDist = probDist(:);
-            probDist = probDist / nansum(probDist);
-            H = -nansum(probDist .* log2(probDist));
+            probDist(probDist < 0) = 0;
+            probDist = probDist / sum(probDist, 'omitnan');
+            H = -sum(probDist .* log2(probDist), 'omitnan');
         end
         
         function expect = Expectation(distMat, val, idxDim)
@@ -1010,37 +1011,48 @@ classdef MMath
             %               'span': compute VE by a set of orthonormal bases that span B.
             %               'unique': compute variance uniquely explained by each basis in B.
             % Output
-            %   VE          A vector of percent variance explained.
+            %   VE          A row vector of percent variance explained on each basis, or a
+            %               scalar if varType is 'span'.
+            % 
             
             if nargin < 3 || size(B,2) == 1
                 varType = 'each';
             end
-            assert(ismember(varType, {'each', 'span', 'unique'}));
+            varType = lower(char(varType));
             
             X = rmmissing(X);
             
-            % Normalize bases
-            L = sqrt(sum(B.^2));
-            L(L == 0) = eps;
-            B = B ./ L;
-            
-            if ~strcmp(varType, 'each')
-                % Find orthonormal bases
-                [Q, R] = qr(B);
-                if ismatrix(R)
-                    r = diag(R);
-                else
-                    r = R(1);
-                end
-                B = Q(:, 1:length(r));
-                if strcmp(varType, 'unique')
-                    % Scale bases
-                    B = B.*r';
-                end
+            switch varType
+                case 'each'
+                    % Normalize bases
+                    L = sqrt(sum(B.^2, 1));
+                    L(L == 0) = eps;
+                    B = B ./ L;
+                    
+                    % Compute variances
+                    varSub = var(X*B);
+                    
+                case 'span'
+                    % Compute total variance in the full span of B
+                    varSub = sum(var(X*orth(B), 0, 1));
+                    
+                case 'unique'
+                    % Compute total variance in the full span of B
+                    varB = sum(var(X*orth(B), 0, 1));
+                    
+                    % Compute total variance in spans of B minus single axes
+                    for i = size(B,2) : -1 : 1
+                        B_ = B(:,[1:i-1 i+1:end]);
+                        varB_(i) = sum(var(X*orth(B_), 0, 1));
+                    end
+                    
+                    % Subtract to get the unique variances
+                    varSub = varB - varB_;
+                    
+                otherwise
+                    error("'%s' is not a valid varType.", varType);
             end
             
-            % Compute variances
-            varSub = var(X*B);
             varTotal = trace(cov(X));
             VE = varSub/varTotal*100;
         end
@@ -1072,6 +1084,7 @@ classdef MMath
             
             C = A'*B;
         end
+        
     end
 end
 
