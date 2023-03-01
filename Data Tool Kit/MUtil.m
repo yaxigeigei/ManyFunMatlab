@@ -6,9 +6,13 @@ classdef MUtil
         function s = CombineStructs(varargin)
             % Combine multiple structs into one. Field names must be unique across structures. 
             %
-            %   s = MUtil.CombineStructs(varargin)
+            %   s = MUtil.CombineStructs(s1, s2, s3, ...)
             % 
-            
+            % Inputs
+            %   s1, s2, s3...   Each input should be a scalar struct with mutually exclusive field names.
+            % Output
+            %   s               Combines struct.
+            % 
             tbs = cellfun(@(x) struct2table(x, 'AsArray', true), varargin, 'Uni', false);
             s = table2struct(cat(2, tbs{:}));
         end
@@ -18,8 +22,14 @@ classdef MUtil
             % 
             %   s = MUtil.EvalFields(s)
             % 
+            % Input
+            %   s       A struct or a struct array.
+            % Output
+            %   s       A struct or a struct array with evaluated field values.
+            % 
             if numel(s) > 1
-                arrayfun(@MUtil.EvalFields, s);
+                s = arrayfun(@MUtil.EvalFields, s);
+                return
             end
             fn = fieldnames(s);
             for i = 1 : numel(fn)

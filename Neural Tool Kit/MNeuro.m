@@ -401,7 +401,8 @@ classdef MNeuro
             % Outputs
             %   mm              An array of mean event rates. Rows are time bins and columns are 
             %                   different types of event. 
-            %   ee              Standard error or CI of elements in mm. 
+            %   se              Standard error of mm, in the same array size.
+            %   ci              Confidence interval of mm, in a samples-by-signals-by-2 array.
             %   stats           A table with the following variables.
             %     colNum          Column index of each event in T.
             %     pkIdx           Index of the time bin where each trace in mm peaks.
@@ -451,8 +452,8 @@ classdef MNeuro
         function [mm, ee, stats] = MeanTimeSeries(S, varargin)
             % Compute mean and related stats of multiple time series across repetitions
             %
-            %   [mm, ee, stats] = MNeuro.MeanTimeSeries(S)
-            %   [mm, ee, stats] = MNeuro.MeanTimeSeries(S, ciArgs)
+            %   [mm, se, stats] = MNeuro.MeanTimeSeries(S)
+            %   [mm, ci, stats] = MNeuro.MeanTimeSeries(S, ciArgs)
             %
             % Inputs
             %   S               A cell array or a table of time series vectors. Rows are repeats 
@@ -462,7 +463,8 @@ classdef MNeuro
             % Outputs
             %   mm              An array of mean time series. Rows are samples and columns are for 
             %                   different signals. 
-            %   ee              Standard error or CI of elements in mm. 
+            %   se              Standard error of mm, in the same array size.
+            %   ci              Confidence interval of mm, in a samples-by-signals-by-2 array.
             %   stats           A table with the following variables.
             %     colNum          Column index of each signal in T.
             %     pkIdx           Index of the time bin where each trace in mm peaks.
