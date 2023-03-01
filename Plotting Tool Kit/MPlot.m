@@ -369,6 +369,19 @@ classdef MPlot
             end
         end
         
+        function alpha = AlphaForOverlap(N)
+            % Find a good alpha transparency based on the number of overlapping traces
+            % 
+            %   alpha = MPlot.AlphaForOverlap(N)
+            % 
+            % Inputs
+            %   N           The number of overlapping traces (or other objects).
+            % Output
+            %   alpha       An optimal alpha transparency.
+            % 
+            alpha = MMath.Bound(1/log2(N), [0 1]);
+        end
+        
         function Paperize(varargin)
             % Make axes comply with conventions of publication
             %
