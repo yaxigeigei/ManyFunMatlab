@@ -1,6 +1,76 @@
 classdef MLing
     % MLing is...
     
+    properties(Constant)
+        % Categories of phonemes
+        voiced = {'ae', 'ax', 'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw', ... % vowels
+                  'v', 'dh', 'z', 'zh', ...     % fricatives
+                  'b', 'd', 'g', 'jh', ...      % plosives
+                  'm', 'n', 'ng', ...           % nasals
+                  'l', 'y', 'r', 'w'};          % 
+        vowels = {'ae',       'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw'};
+        fricatives = {'f', 'v', 'th', 'dh', 's', 'z', 'sh', 'zh', 'hh'};
+        plosives = {'p', 'b', 't', 'd', 'k', 'g', 'ch', 'jh'};
+        nasals = {'m', 'n', 'ng'};
+        
+        % Symbol conversion lookup
+        dict = { % columns: ARPAbet, IPA
+            % Standard
+            'AA',   'ɑ';
+            'AE',   'æ';
+            'AH',   'ʌ';
+            'AO',   'ɔ';
+            'AW',   'aʊ';
+            'AY',   'aɪ';
+            'B',    'b';
+            'CH',   'tʃ';
+            'D',    'd';
+            'DH',   'ð';
+            'EH',   'ɛ';
+            'ER',   'ɝ';
+            'EY',   'eɪ';
+            'F',    'f';
+            'G',    'ɡ';
+            'HH',   'h';
+            'IH',   'ɪ';
+            'IY',   'i';
+            'JH',   'dʒ';
+            'K',    'k';
+            'L',    'l';
+            'M',    'm';
+            'N',    'n';
+            'NG',   'ŋ';
+            'OW',   'oʊ';
+            'OY',   'ɔɪ';
+            'P',    'p';
+            'R',    'r';
+            'S',    's';
+            'SH',   'ʃ';
+            'T',    't';
+            'TH',   'θ';
+            'UH',   'ʊ';
+            'UW',   'u';
+            'V',    'v';
+            'W',    'w';
+            'Y',    'j';
+            'Z',    'z';
+            'ZH',   'ʒ';
+            % TIMIT specific
+            'AX',   'ə̥';
+            'BCL',  'b̚';
+            'DCL',  'd̚';
+            'ENG',  'ŋ̍';
+            'GCL',  'ɡ̚';
+            'HV',   'ɦ';
+            'KCL',  'k̚';
+            'PCL',  'p̚';
+            'TCL',  't̚';
+            'PAU',  '';
+            'EPI',  '';
+            'H#',   '';
+            };
+    end
+    
     methods(Static)
         function [k1, k2, alignInfo] = FindAlignedWords(s1, s2)
             % Globally align two sentences at the level of letters, then find pairs of corresponding words.
@@ -103,10 +173,10 @@ classdef MLing
             alignInfo.tscore = tscore;
         end
         
-        function [wf, t] = ReadTimitWaveform(timitDir, id)
+        function [wf, t] = ReadTimitWaveform(srcDir, id)
             % Read TIMIT audio waveform
             %
-            %   tg = ReadTimitWaveform(timitDir, id)
+            %   [wf, t] = MLing.ReadTimitWaveform(timitDir, id)
             % 
             % Inputs
             %   srcDir      The source directory path of TIMIT feature/label files.
@@ -117,12 +187,12 @@ classdef MLing
             % 
             
             id = cellstr(id);
-            assert(exist(timitDir, 'dir'), "The source directory does not exist.");
+            assert(exist(srcDir, 'dir'), "The source directory does not exist.");
             wf = cell(size(id));
             t = wf;
             fs = 16e3; % hardcode the TIMIT sampling frequency
             for i = 1 : numel(wf)
-                p = fullfile(timitDir, id{i} + ".wav");
+                p = fullfile(srcDir, id{i} + ".wav");
                 wf{i} = audioread(p);
                 t{i} = (1:length(wf{i}))' / fs;
             end
@@ -131,7 +201,7 @@ classdef MLing
         function tg = ReadTimitFeatures(srcDir, id, varargin)
             % Construct textgrid compatible struct from wrd, phn
             %
-            %   tg = ReadTimitFeatures(timitDir, id)
+            %   tg = MLing.ReadTimitFeatures(timitDir, id)
             % 
             % Inputs
             %   srcDir      The source directory path of TIMIT feature/label files.
@@ -140,8 +210,8 @@ classdef MLing
             %   tg          An array of structs compatible to use with the TextGrid MATLAB package.
             %               Currently it only contains words and phones level.
             % 
-            % TODO          Add syllable level to tg.
-            %               Read quantity features such as formants.
+            % TODO          Add syllable tier to tg.
+            %               Read quantity features such as pitch and formants.
             % 
             
             p = inputParser();
@@ -156,7 +226,7 @@ classdef MLing
                 % Read wrd and phn files as tables
                 wrdFile = fullfile(srcDir, id{i} + ".wrd");
                 phnFile = fullfile(srcDir, id{i} + ".phn");
-                if ~exist(wrdFile, 'file') || ~exist(wrdFile, 'file')
+                if ~exist(wrdFile, 'file') || ~exist(phnFile, 'file')
                     warning('Cannot find wrd and/or phn files with stim ID: ''%s''', id{i});
                     continue
                 end
@@ -196,6 +266,32 @@ classdef MLing
             % Convert to struct array or remain as cell array
             if isUni
                 tg = cat(1, tg{:});
+            end
+        end
+        
+        function labels = ARPA2IPA(labels)
+            % Map ARPAbet symbols to IPA symbols
+            % 
+            %   labels = MLing.ARPA2IPA(labels)
+            % 
+            
+            dict = MLing.dict(:, [1 2]);
+            
+            dtype = class(labels);
+            
+            labels = cellstr(labels);
+            labels = upper(labels);
+            for k = 1 : numel(labels)
+                I = find(strcmp(labels{k}, dict(:,1)), 1);
+                if ~isempty(I)
+                    labels{k} = dict{I,2};
+                end
+            end
+            
+            if dtype == "char"
+                labels = labels{1};
+            elseif dtype == "string"
+                labels = string(labels);
             end
         end
         
