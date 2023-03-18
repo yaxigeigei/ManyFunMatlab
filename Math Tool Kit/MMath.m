@@ -826,6 +826,66 @@ classdef MMath
             I = nansum(I(:));
         end
         
+        function [N, c, k] = Normalize(A, normType, normParam)
+            % Normalize data in the columns of an array. The 'soft' version of each method scales 
+            % smaller signals less than larger signals.
+            % 
+            %   [N, c, k] = MMath.Normalize(A)
+            %   [N, c, k] = MMath.Normalize(A, normType)
+            %   [N, c, k] = MMath.Normalize(A, normType, normParam)
+            % 
+            % Inputs
+            %   A           An m-by-n numeric array where each column will be normalized.
+            %   normType    Standard normalization methods:
+            %                 'zscore' (default): zscore each timeseries.
+            %                 'max': normalize each timeseries by maximum or peak value.
+            %                 'minmax': normalize each timeseries by maximum or peak value.
+            %                 'none': no normalization.
+            %               Soft normalization (e.g. Russo et al. 2018):
+            %                 If appending a method name with 'soft', the normParam value will be 
+            %                 added to the normalization target. For example, 'maxsoft' normalizes 
+            %                 timeseries to max(A)+normParam rather than max(A). 'zscoresoft' 
+            %                 treats normParam as a value added to the amplitude of a sinusoidal 
+            %                 timeseries, and converts it to a value added to standard deviation.
+            %   normParam   See the soft normalization above.
+            % Outputs
+            %   N           An m-by-n array where each columns is normalized by N = (A-c)./k
+            %   c           A 1-by-n vector of offsets applied to A.
+            %   k           A 1-by-n vector of scaling factors applied after offset.
+            % 
+            
+            if nargin < 2
+                normType = 'zscore';
+            end
+            normType = lower(char(normType));
+            
+            k = 1;
+            c = 0;
+            switch normType
+                case 'max'
+                    k = max(A, [], 1, 'omitnan');
+                case 'maxsoft'
+                    k = max(A+normParam, [], 1, 'omitnan');
+                case 'minmax'
+                    c = min(A, [], 1, 'omitnan');
+                    k = max(A-c, [], 1, 'omitnan');
+                case 'minmaxsoft'
+                    c = min(A, [], 1, 'omitnan');
+                    k = max(A-c+normParam, [], 1, 'omitnan');
+                case 'zscore'
+                    c = mean(A, 1, 'omitnan');
+                    k = std(A-c, 0, 1, 'omitnan');
+                case 'zscoresoft'
+                    c = mean(A, 1, 'omitnan');
+                    k = std(A-c, 0, 1, 'omitnan') + normParam*0.707/2; % 0.707/2 converts max to equivalent std
+                case 'none'
+                    % do nothing
+                otherwise
+                    error("'%s' is not a valid normalization option.", normType);
+            end
+            N = (A-c)./k;
+        end
+        
         function [r2, r2adj] = RSquared(X, y, b, c)
             % Compute R-squared and adjusted R-squared
             %
