@@ -1,76 +1,6 @@
 classdef MLing
     % MLing is...
     
-    properties(Constant)
-        % Categories of phonemes
-        voiced = {'ae', 'ax', 'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw', ... % vowels
-                  'v', 'dh', 'z', 'zh', ...     % fricatives
-                  'b', 'd', 'g', 'jh', ...      % plosives
-                  'm', 'n', 'ng', ...           % nasals
-                  'l', 'y', 'r', 'w'};          % 
-        vowels = {'ae',       'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw'};
-        fricatives = {'f', 'v', 'th', 'dh', 's', 'z', 'sh', 'zh', 'hh'};
-        plosives = {'p', 'b', 't', 'd', 'k', 'g', 'ch', 'jh'};
-        nasals = {'m', 'n', 'ng'};
-        
-        % Symbol conversion lookup
-        dict = { % columns: ARPAbet, IPA
-            % Standard
-            'AA',   'ɑ';
-            'AE',   'æ';
-            'AH',   'ʌ';
-            'AO',   'ɔ';
-            'AW',   'aʊ';
-            'AY',   'aɪ';
-            'B',    'b';
-            'CH',   'tʃ';
-            'D',    'd';
-            'DH',   'ð';
-            'EH',   'ɛ';
-            'ER',   'ɝ';
-            'EY',   'eɪ';
-            'F',    'f';
-            'G',    'ɡ';
-            'HH',   'h';
-            'IH',   'ɪ';
-            'IY',   'i';
-            'JH',   'dʒ';
-            'K',    'k';
-            'L',    'l';
-            'M',    'm';
-            'N',    'n';
-            'NG',   'ŋ';
-            'OW',   'oʊ';
-            'OY',   'ɔɪ';
-            'P',    'p';
-            'R',    'r';
-            'S',    's';
-            'SH',   'ʃ';
-            'T',    't';
-            'TH',   'θ';
-            'UH',   'ʊ';
-            'UW',   'u';
-            'V',    'v';
-            'W',    'w';
-            'Y',    'j';
-            'Z',    'z';
-            'ZH',   'ʒ';
-            % TIMIT specific
-            'AX',   'ə̥';
-            'BCL',  'b̚';
-            'DCL',  'd̚';
-            'ENG',  'ŋ̍';
-            'GCL',  'ɡ̚';
-            'HV',   'ɦ';
-            'KCL',  'k̚';
-            'PCL',  'p̚';
-            'TCL',  't̚';
-            'PAU',  '';
-            'EPI',  '';
-            'H#',   '';
-            };
-    end
-    
     methods(Static)
         function [k1, k2, alignInfo] = FindAlignedWords(s1, s2)
             % Globally align two sentences at the level of letters, then find pairs of corresponding words.
@@ -295,6 +225,96 @@ classdef MLing
             end
         end
         
+        function c = GetPhoneColor(ph)
+            % 
+            
+            ph = lower(ph);
+            cmap = lines(7);
+%             cmap = brewermap(7, 'Set1');
+            
+            if ismember(ph, MLing.vowels)
+                c = cmap(1,:);
+            elseif ismember(ph, MLing.fricatives)
+                c = cmap(2,:);
+            elseif ismember(ph, MLing.plosives)
+                c = cmap(3,:);
+            elseif ismember(ph, MLing.nasals)
+                c = cmap(4,:);
+            else
+                c = cmap(end,:);
+            end
+        end
     end
+    
+    properties(Constant)
+        % Categories of phonemes
+        voiced = {'ae', 'ax', 'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw', ... % vowels
+                  'v', 'dh', 'z', 'zh', ...     % fricatives
+                  'b', 'd', 'g', 'jh', ...      % plosives
+                  'm', 'n', 'ng', ...           % nasals
+                  'l', 'y', 'r', 'w'};          % 
+        vowels = {'ae',       'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw'};
+        fricatives = {'f', 'v', 'th', 'dh', 's', 'z', 'sh', 'zh', 'hh'};
+        plosives = {'p', 'b', 't', 'd', 'k', 'g', 'ch', 'jh'};
+        nasals = {'m', 'n', 'ng'};
+        
+        % Symbol conversion lookup
+        dict = { % columns: ARPAbet, IPA
+            % Standard
+            'AA',   'ɑ';
+            'AE',   'æ';
+            'AH',   'ʌ';
+            'AO',   'ɔ';
+            'AW',   'aʊ';
+            'AY',   'aɪ';
+            'B',    'b';
+            'CH',   'tʃ';
+            'D',    'd';
+            'DH',   'ð';
+            'EH',   'ɛ';
+            'ER',   'ɝ';
+            'EY',   'eɪ';
+            'F',    'f';
+            'G',    'ɡ';
+            'HH',   'h';
+            'IH',   'ɪ';
+            'IY',   'i';
+            'JH',   'dʒ';
+            'K',    'k';
+            'L',    'l';
+            'M',    'm';
+            'N',    'n';
+            'NG',   'ŋ';
+            'OW',   'oʊ';
+            'OY',   'ɔɪ';
+            'P',    'p';
+            'R',    'r';
+            'S',    's';
+            'SH',   'ʃ';
+            'T',    't';
+            'TH',   'θ';
+            'UH',   'ʊ';
+            'UW',   'u';
+            'V',    'v';
+            'W',    'w';
+            'Y',    'j';
+            'Z',    'z';
+            'ZH',   'ʒ';
+            % TIMIT specific
+            'AX',   'ə̥';
+            'BCL',  'b̚';
+            'DCL',  'd̚';
+            'ENG',  'ŋ̍';
+            'GCL',  'ɡ̚';
+            'HV',   'ɦ';
+            'KCL',  'k̚';
+            'PCL',  'p̚';
+            'TCL',  't̚';
+            'PAU',  '';
+            'EPI',  '';
+            'H#',   '';
+            };
+    end
+    
 end
 
