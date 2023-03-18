@@ -6,6 +6,19 @@ classdef MPlot
     end
     
     methods(Static)
+        function alpha = AlphaForOverlap(N)
+            % Find a good alpha transparency based on the number of overlapping traces
+            % 
+            %   alpha = MPlot.AlphaForOverlap(N)
+            % 
+            % Inputs
+            %   N           The number of overlapping traces (or other objects).
+            % Output
+            %   alpha       An optimal alpha transparency.
+            % 
+            alpha = MMath.Bound(1/log2(N), [0 1]);
+        end
+        
         function varargout = Axes(varargin)
             % Change Axes object with custom defaults
             switch numel(varargin)
@@ -369,17 +382,55 @@ classdef MPlot
             end
         end
         
-        function alpha = AlphaForOverlap(N)
-            % Find a good alpha transparency based on the number of overlapping traces
+        function spArgs = FindSubplotInd(rows, cols, rowRange, colRange)
+            % Return subplot indices based on the requested layout
             % 
-            %   alpha = MPlot.AlphaForOverlap(N)
+            %   spArgs = MPlot.FindSubplotInd(nRows, nCols, rowRange, colRange)
+            %   spArgs = MPlot.FindSubplotInd(rowDist, colDist, rowRange, colRange)
             % 
             % Inputs
-            %   N           The number of overlapping traces (or other objects).
+            %   nRows, nCols        Same as the first two inputs to the subplot function.
+            %                       Each row and column will be partitioned as a block.
+            %   rowDist, colDist    Numeric vector of integer numbers specifying how to 
+            %                       partition rows and columns into blocks following the 
+            %                       same convention as the mat2cell function.
+            %   rowRange, colRange  Vector of block row and column indiced indicating 
+            %                       where the plot will be placed. Note that the rows and 
+            %                       columns here refer to the partitioned blocks.
             % Output
-            %   alpha       An optimal alpha transparency.
+            %   spArgs              A 1-by-3 cell array containing the three inputs to 
+            %                       the subplot function, e.g. ax = subplot(spArgs{:})
             % 
-            alpha = MMath.Bound(1/log2(N), [0 1]);
+            % See also subplot, mat2cell
+            
+            if isscalar(rows)
+                rowDist = ones(rows, 1);
+            else
+                rowDist = rows;
+            end
+            if isscalar(cols)
+                colDist = ones(cols, 1);
+            else
+                colDist = cols;
+            end
+            nRow = sum(rowDist);
+            nCol = sum(colDist);
+            
+            if isempty(rowRange)
+                rowRange = 1 : numel(rowDist);
+            end
+            if isempty(colRange)
+                colRange = 1 : numel(colDist);
+            end
+            
+            grid = mat2cell(zeros(nRow, nCol), rowDist, colDist);
+            for i = rowRange(:)'
+                for j  = colRange(:)'
+                    grid{i,j}(:) = 1;
+                end
+            end
+            grid = cell2mat(grid);
+            spArgs = {nRow, nCol, find(grid')};
         end
         
         function Paperize(varargin)
@@ -608,6 +659,20 @@ classdef MPlot
         
         function PlotRasterStack(spk, varargin)
             % Plot rasters from a spikeTime table (or its cell array) in one axes with stacking units
+            % 
+            %   MPlot.PlotRasterStack(spk)
+            %   MPlot.PlotRasterStack(..., 'Color', [])
+            %   MPlot.PlotRasterStack(..., 'MarkUnits', [])
+            %   MPlot.PlotRasterStack(..., 'MarkTrials', [])
+            %   MPlot.PlotRasterStack(..., 'Parent', [])
+            % 
+            % Inputs
+            %   spk             A trials-by-units table or a cell array of spike time vectors.
+            %   'Color'         A units-by-3 RGB or units-by-4 RGBA array. If empty [], units alternate 
+            %                   colors between [0 0 0 .7] and [.3 .3 .3 .7].
+            %   'MarkUnits'     A vector of indices for units to be marked by dark red [.8 0 0 1].
+            %   'MarkTrials'    A vector of indices for trials to be marked by dark red [.8 0 0 1].
+            %   'Parent'        Axes object to plot in.
             
             p = inputParser();
             p.addParameter('Color', [], @(x) true);
@@ -671,16 +736,36 @@ classdef MPlot
         
         function PlotHistStack(t, hh, ee, varargin)
             % Plot a stack of histograms in one axes
+            % 
+            %   MPlot.PlotHistStack(t, hh, ee)
+            %   MPlot.PlotHistStack(..., 'Scaling', 1)
+            %   MPlot.PlotHistStack(..., 'Style', 'trace')
+            %   MPlot.PlotHistStack(..., 'Color', [])
+            %   MPlot.PlotHistStack(..., 'MarkUnits', [])
+            %   MPlot.PlotHistStack(..., 'Parent', [])
+            % 
+            % Inputs
+            %   t               A trials-by-units table or a cell array of spike time vectors.
+            %   t               A trials-by-units table or a cell array of spike time vectors.
+            %   t               A trials-by-units table or a cell array of spike time vectors.
+            %   'Scaling'       
+            %   'Style'         
+            %   'Color'         A units-by-3 RGB or units-by-4 RGBA array. If empty [], units alternate 
+            %                   colors between [0 0 0] and [.3 .3 .3].
+            %   'MarkUnits'     A vector of indices for units to be marked by dark red [.8 0 0 1].
+            %   'Parent'        Axes object to plot in.
             
             p = inputParser();
+            p.addParameter('Color', [], @(x) true);
             p.addParameter('Scaling', 1, @(x) isnumeric(x) && isscalar(x));
             p.addParameter('Style', 'trace', @(x) ismember(x, {'trace', 'bar'}));
             p.addParameter('MarkUnits', [], @isnumeric);
             p.addParameter('Parent', [], @(x) isa(x, 'matlab.graphics.axis.Axes'));
             p.parse(varargin{:});
+            unit_c = p.Results.Color;
             frac = p.Results.Scaling;
             style = p.Results.Style;
-            indMk = p.Results.MarkUnits;
+            indMU = p.Results.MarkUnits;
             ax = p.Results.Parent;
             
             if isempty(ax)
@@ -693,8 +778,12 @@ classdef MPlot
             
             % Determine colors
             n_units = size(hh, 2);
-            unit_c = repmat({[0 0 0], [0 0 0]+.3}, [1 ceil(n_units/2)]);
-            unit_c(indMk) = {[.8 0 0]}; % hightlight selected histograms in red
+            if isempty(unit_c)
+                unit_c = repmat([0 0 0; .3 .3 .3], [ceil(n_units/2) 1]);
+            end
+            if ~isempty(indMU)
+                unit_c(indMU,:) = [.8 0 0]; % hightlight selected histograms in red
+            end
             
             % Prepare bins for bar plots
             binSize = t(2) - t(1);
@@ -712,10 +801,10 @@ classdef MPlot
                     case 'bar'
                         px = repelem(binEdges, 2);
                         py = [0 repelem(hh(:,i)',2) 0];
-                        patch(ax, px, -py+y+1, unit_c{m}, 'FaceAlpha', .1, 'EdgeColor', 'none');
+                        patch(ax, px, -py+y+1, unit_c(m,:), 'FaceAlpha', .1, 'EdgeColor', 'none');
                     case 'trace'
-                        plot(ax, t, -hh(:,i)+y+1, 'Color', [unit_c{m} .5], 'LineWidth', 1);
-                        MPlot.ErrorShade(t, -hh(:,i)+y+1, ee(:,i), 'Alpha', 0.1, 'Parent', ax);
+                        plot(ax, t, -hh(:,i)+y+1, 'Color', [unit_c(m,:) .5], 'LineWidth', 1);
+                        MPlot.ErrorShade(t, -hh(:,i)+y+1, ee(:,i), 'Color', unit_c(m,:), 'Alpha', 0.1, 'Parent', ax);
                     otherwise
                         error('%s is not a supported style', style);
                 end
