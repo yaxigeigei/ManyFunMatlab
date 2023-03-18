@@ -258,7 +258,7 @@ classdef MSessionExplorer < handle
             % Inputs
             %   epochDist       An n-element numeric vector for the numbers of epochs to split. 
             %                   This is similar to rowDist in MATLAB's mat2cell function.
-            %   epochInd        A cell array of 
+            %   epochInd        A cell array where each element is a vector of epoch indices.
             % Output
             %   seArray         A vector of MSessionExplorer objects.
             %
@@ -274,6 +274,8 @@ classdef MSessionExplorer < handle
                 epB = cumsum(epDist);
                 epA = [0; epB(1:end-1)] + 1;
                 epInd = arrayfun(@(a,b) (a:b)', epA, epB, 'Uni', false);
+            else
+                epInd = epochArg;
             end
             
             % Initialize se objects with userData
@@ -440,15 +442,15 @@ classdef MSessionExplorer < handle
             %   tbNames         A string or cell array of the name(s) of table which reference time is 
             %                   set to. The default is empty and rt is set to all eligible tables.
             
-            rt = rt(:);
-            if ~all(diff(rt) > 0)
-                warning('Reference times are not monotonically increasing');
-            end
-            
             if nargin < 3
                 tbNames = this.tableNames(~this.isEventValuesTable);
             end
             this.IValidateTableNames(tbNames, true);
+            
+            rt = rt(:);
+            if ~all(diff(rt) > 0)
+                disp('Reference times are not monotonically increasing');
+            end
             
             tbNames = cellstr(tbNames);
             for i = 1 : numel(tbNames)
