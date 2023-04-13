@@ -103,6 +103,41 @@ classdef MLing
             alignInfo.tscore = tscore;
         end
         
+        function id = FindTimitID(srcDir, varargin)
+            % Find TIMIT stim IDs
+            % 
+            %   id = FindTimitID(srcDir)
+            %   id = FindTimitID(srcDir, idPattern)
+            % 
+            % Inputs
+            %   srcDir      The source directory path of TIMIT feature/label files.
+            %   idPattern   A string of text pattern to match for. Default is '*_*.wav'.
+            % Output
+            %   id          A cell or string array of TIMIT stim IDs.
+            % 
+            
+            assert(exist(srcDir, 'dir'), "The source directory does not exist.");
+            
+            p = inputParser();
+            p.addOptional('pattern', '*_*.wav', @(x) isstring(x) || ischar(x) || iscellstr(x));
+            p.parse(varargin{:});
+            pattern = p.Results.id;
+            
+            % Search for all sentences based on wav file
+            search = MBrowse.Dir2Table(fullfile(srcDir, pattern));
+            [~, id] = fileparts(search.name);
+            
+            id = cellstr(id);
+            
+            % Exclude bad sentences
+            badIds = {'mdwh0_si1925'};
+            isBad = ismember(id, badIds);
+            if any(isBad)
+                fprintf("Exclude %s due to incomplete labels\n", id{isBad});
+                id(isBad) = [];
+            end
+        end
+        
         function [wf, t] = ReadTimitWaveform(srcDir, id)
             % Read TIMIT audio waveform
             %
@@ -111,13 +146,12 @@ classdef MLing
             % Inputs
             %   srcDir      The source directory path of TIMIT feature/label files.
             %   id          A cell or string array of TIMIT stim IDs.
-            % Output
+            % Outputs
             %   wf          A cell array of audio waveform.
             %   t           Timestamps associated with wf in seconds.
             % 
-            
-            id = cellstr(id);
             assert(exist(srcDir, 'dir'), "The source directory does not exist.");
+            id = cellstr(id);
             wf = cell(size(id));
             t = wf;
             fs = 16e3; % hardcode the TIMIT sampling frequency
@@ -128,7 +162,7 @@ classdef MLing
             end
         end
         
-        function tg = ReadTimitFeatures(srcDir, id, varargin)
+        function tg = ReadTimitFeatures(srcDir, varargin)
             % Construct textgrid compatible struct from wrd, phn
             %
             %   tg = MLing.ReadTimitFeatures(timitDir, id)
@@ -145,8 +179,10 @@ classdef MLing
             % 
             
             p = inputParser();
+            p.addOptional('id', [], @(x) isstring(x) || ischar(x) || iscellstr(x));
             p.addParameter('UniformOutput', true, @islogical);
             p.parse(varargin{:});
+            id = p.Results.id;
             isUni = p.Results.UniformOutput;
             
             id = cellstr(id);
@@ -212,7 +248,9 @@ classdef MLing
             labels = cellstr(labels);
             labels = upper(labels);
             for k = 1 : numel(labels)
-                I = find(strcmp(labels{k}, dict(:,1)), 1);
+                L = labels{k};
+                L(L>='0' & L<='9') = []; % remove the trailing digit in phonemes
+                I = find(strcmp(L, dict(:,1)), 1);
                 if ~isempty(I)
                     labels{k} = dict{I,2};
                 end
@@ -248,15 +286,39 @@ classdef MLing
     
     properties(Constant)
         % Categories of phonemes
-        voiced = {'ae', 'ax', 'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw', ... % vowels
-                  'v', 'dh', 'z', 'zh', ...     % fricatives
-                  'b', 'd', 'g', 'jh', ...      % plosives
-                  'm', 'n', 'ng', ...           % nasals
-                  'l', 'y', 'r', 'w'};          % 
-        vowels = {'ae',       'aa', 'ah', 'ao', 'aw', 'ay', 'eh', 'er', 'ey', 'ih', 'iy', 'ow', 'oy', 'uh', 'uw'};
-        fricatives = {'f', 'v', 'th', 'dh', 's', 'z', 'sh', 'zh', 'hh'};
-        plosives = {'p', 'b', 't', 'd', 'k', 'g', 'ch', 'jh'};
-        nasals = {'m', 'n', 'ng'};
+        vowels = {'AE','AX', 'AXR','AA','AH','AO','AW','AY','EH','ER','EY','IH','IY', 'IX','OW','OY','UH','UW', 'UX'};
+        high = {'IY', 'IH', 'IX', 'UH', 'UW', 'UX'};
+        mid = {'EH', 'EY', 'AX', 'AXR','ER', 'AH', 'AO', 'OW', 'OY'};
+        low = {'AE', 'AA', 'AY', 'AW'};
+        front = {'IH', 'IY', 'IX', 'EH', 'EY', 'AE', 'AX', 'AXR','ER'};
+        back = {'UH', 'UW', 'UX', 'OW', 'AO', 'OY', 'AA', 'AW', 'AY', 'AH'};
+        diphthongs = {'EY', 'AY', 'OW', 'OY', 'AW'};
+        
+        consonants = [MLing.plosives MLing.fricatives MLing.affricates MLing.nasals MLing.approximants];
+        plosives = {'P', 'B', 'T', 'D', 'K', 'G'};
+        fricatives = {'F', 'V', 'TH', 'DH', 'S', 'Z', 'SH', 'ZH', 'HH'};
+        affricates = {'CH', 'JH'};
+        nasals = {'M', 'N', 'NG'};
+        approximants = {'L', 'R', 'W', 'Y'};
+        
+        labial = {'P', 'B', 'M', 'W', 'F', 'V'};
+        coronal = [MLing.dental MLing.alveolar MLing.postalveolar];
+        dental = {'TH', 'DH'};
+        alveolar = {'T', 'D', 'S', 'Z', 'N', 'R', 'L'};
+        postalveolar = {'SH', 'ZH', 'CH', 'JH'};
+        palatal = {'Y'};
+        velar = {'K', 'G', 'NG'};
+        glottal = {'HH'};
+        
+        rounded = {'OW','OY','AW','AY','UH','UW','AO','R','W'}; % needs to double-check
+        
+        voiced = [ ...
+            MLing.vowels ...
+            {'B','D','G'} ...           % voiced plosives
+            {'V','DH','Z','ZH'} ...     % voiced fricatives
+            {'JH'} ...                  % voiced affricate
+            MLing.nasals MLing.approximants ...
+            ];
         
         % Symbol conversion lookup
         dict = { % columns: ARPAbet, IPA
@@ -266,11 +328,17 @@ classdef MLing
             'AH',   'ʌ';
             'AO',   'ɔ';
             'AW',   'aʊ';
+            'AX',   'ə';
+            'AXR',  'ɚ';
             'AY',   'aɪ';
             'B',    'b';
             'CH',   'tʃ';
             'D',    'd';
             'DH',   'ð';
+            'DX',   'ɾ';
+            'EL',   'l̩';
+            'EM',   'm̩';
+            'EN',   'n̩';
             'EH',   'ɛ';
             'ER',   'ɝ';
             'EY',   'eɪ';
@@ -278,6 +346,7 @@ classdef MLing
             'G',    'ɡ';
             'HH',   'h';
             'IH',   'ɪ';
+            'IX',   'ɨ';
             'IY',   'i';
             'JH',   'dʒ';
             'K',    'k';
@@ -285,23 +354,26 @@ classdef MLing
             'M',    'm';
             'N',    'n';
             'NG',   'ŋ';
+            'NX',   'ɾ̃';
             'OW',   'oʊ';
             'OY',   'ɔɪ';
             'P',    'p';
-            'R',    'r';
+            'Q',    'ʔ';
+            'R',    'ɹ';
             'S',    's';
             'SH',   'ʃ';
             'T',    't';
             'TH',   'θ';
             'UH',   'ʊ';
             'UW',   'u';
+            'UX',   'ʉ';
             'V',    'v';
             'W',    'w';
             'Y',    'j';
             'Z',    'z';
             'ZH',   'ʒ';
             % TIMIT specific
-            'AX',   'ə̥';
+            'AX-H', 'ə̥';
             'BCL',  'b̚';
             'DCL',  'd̚';
             'ENG',  'ŋ̍';
