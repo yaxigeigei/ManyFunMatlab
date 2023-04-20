@@ -263,63 +263,9 @@ classdef MLing
             end
         end
         
-        function c = GetPhoneColor(ph)
-            % 
-            
-            ph = lower(ph);
-            cmap = lines(7);
-%             cmap = brewermap(7, 'Set1');
-            
-            if ismember(ph, MLing.vowels)
-                c = cmap(1,:);
-            elseif ismember(ph, MLing.fricatives)
-                c = cmap(2,:);
-            elseif ismember(ph, MLing.plosives)
-                c = cmap(3,:);
-            elseif ismember(ph, MLing.nasals)
-                c = cmap(4,:);
-            else
-                c = cmap(end,:);
-            end
-        end
     end
     
     properties(Constant)
-        % Categories of phonemes
-        vowels = {'AE','AX', 'AXR','AA','AH','AO','AW','AY','EH','ER','EY','IH','IY', 'IX','OW','OY','UH','UW', 'UX'};
-        high = {'IY', 'IH', 'IX', 'UH', 'UW', 'UX'};
-        mid = {'EH', 'EY', 'AX', 'AXR','ER', 'AH', 'AO', 'OW', 'OY'};
-        low = {'AE', 'AA', 'AY', 'AW'};
-        front = {'IH', 'IY', 'IX', 'EH', 'EY', 'AE', 'AX', 'AXR','ER'};
-        back = {'UH', 'UW', 'UX', 'OW', 'AO', 'OY', 'AA', 'AW', 'AY', 'AH'};
-        diphthongs = {'EY', 'AY', 'OW', 'OY', 'AW'};
-        
-        consonants = [MLing.plosives MLing.fricatives MLing.affricates MLing.nasals MLing.approximants];
-        plosives = {'P', 'B', 'T', 'D', 'K', 'G'};
-        fricatives = {'F', 'V', 'TH', 'DH', 'S', 'Z', 'SH', 'ZH', 'HH'};
-        affricates = {'CH', 'JH'};
-        nasals = {'M', 'N', 'NG'};
-        approximants = {'L', 'R', 'W', 'Y'};
-        
-        labial = {'P', 'B', 'M', 'W', 'F', 'V'};
-        coronal = [MLing.dental MLing.alveolar MLing.postalveolar];
-        dental = {'TH', 'DH'};
-        alveolar = {'T', 'D', 'S', 'Z', 'N', 'R', 'L'};
-        postalveolar = {'SH', 'ZH', 'CH', 'JH'};
-        palatal = {'Y'};
-        velar = {'K', 'G', 'NG'};
-        glottal = {'HH'};
-        
-        rounded = {'OW','OY','AW','AY','UH','UW','AO','R','W'}; % needs to double-check
-        
-        voiced = [ ...
-            MLing.vowels ...
-            {'B','D','G'} ...           % voiced plosives
-            {'V','DH','Z','ZH'} ...     % voiced fricatives
-            {'JH'} ...                  % voiced affricate
-            MLing.nasals MLing.approximants ...
-            ];
-        
         % Symbol conversion lookup
         dict = { % columns: ARPAbet, IPA
             % Standard
