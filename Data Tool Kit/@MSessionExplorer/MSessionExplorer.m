@@ -954,7 +954,6 @@ classdef MSessionExplorer < handle
             
             % Validate and standardize row and column indices
             [rowInd, colInd] = this.IValidateTableIndexing(tbIn, rowInd, colInd);
-            tbIn = tbIn(:,colInd);
             
             % Validate and standardize time edges
             tEdges = this.IValidateTimeEdges(tEdges, height(tbIn), rowInd);
