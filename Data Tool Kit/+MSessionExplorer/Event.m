@@ -185,6 +185,49 @@ classdef Event
             end
         end
         
+        % Utilities
+        function mask = MaskTimestamps(obj, t, tPad)
+            % Get a mask for a vector of timestamps where samples spanned by utterances are set to true
+            % obj.T must contain tOn and tOff fields
+            % 
+            %   mask = MaskTimestamps(obj, t)
+            %   mask = MaskTimestamps(obj, t, tPad)
+            % 
+            % Inputs
+            %   t           A numeric vector of timestamps.
+            %   tPad        The amount of time to pad at the onset and offset of each object. Positive 
+            %               padding extends the boundaries, negative padding shortens them. Default tPad
+            %               is zero and no padding is performed.
+            %               1) If tPad is a scalar, the same amount is padded to both onsets and offsets
+            %                  for all objects.
+            %               2) If tPad is a 1-by-2 vector, the first element is used to pad onsets and the 
+            %                  second element is used to pad offsets for all objects.
+            %               3) If tPad is an n-by-1 or n-by-2 vector where n is the number of objects, 
+            %                  each object will use the value(s) in the corresponding row of tPad.
+            % Output
+            %   mask        A logical vector with the same size as t.
+            % 
+            
+            if nargin < 3
+                tPad = 0;
+            end
+            if size(tPad,2) == 1
+                tPad = repmat(tPad, [1 2]);
+            end
+            if size(tPad,1) == 1
+                tPad = repmat(tPad, [numel(obj) 1]);
+            end
+            
+            mask = false(size(t));
+            for i = 1 : numel(obj)
+                t1 = obj(i).T.tOn - tPad(i,1);
+                t2 = obj(i).T.tOff + tPad(i,2);
+                
+                ind = t >= t1 & t < t2;
+                mask(ind) = true;
+            end
+        end
+        
         % Function Overloading
         function obj = round(obj, varargin)
             % Round timestamp variables including t and fields in T
@@ -294,7 +337,7 @@ classdef Event
     end
     
     methods(Access = private)
-        % Utilities
+        % Private utilities
         function val = IGet_t(this)
             val = zeros(size(this));
             for i = 1 : numel(this)
