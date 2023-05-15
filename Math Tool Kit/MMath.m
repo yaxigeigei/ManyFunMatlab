@@ -255,17 +255,18 @@ classdef MMath
             B = reshape(A, [prod(sz(dims)) sz(otherDims)]);
         end
         
-        function [ condDist, margDist ] = ConditionalDist(jointDist, givenWhich)
+        function [condDist, margDist] = ConditionalDist(jointDist, givenWhich)
             %Compute conditional probability distribution from joint distribution
             %
-            %   [ condDist, margDist ] = MMath.ConditionalDist(jointDist, givenWhich)
+            %   [condDist, margDist] = MMath.ConditionalDist(jointDist, givenWhich)
             %
-            % Inputs:
-            %   jointDist       multidimentional (>=2) array of joint probability
-            %   givenWhich      dimentions to condition on (currently has to be ndims(jointDist)-1 dimensions)
-            % Output:
-            %   condDist        array of conditional distribution
-            %   margDist        marginal distribution
+            % Inputs
+            %   jointDist       Multidimentional (>=2) array of joint probability
+            %   givenWhich      Dimentions to condition on (currently has to be ndims(jointDist)-1 dimensions)
+            % Outputs
+            %   condDist        Array of conditional distribution
+            %   margDist        Marginal distribution
+            % 
             
             % Collapsing other dimensions
             numDims = ndims(jointDist);
@@ -274,7 +275,7 @@ classdef MMath
                 margDist = jointDist;
             else
                 for i = 1 : length(margWhich)
-                    margDist = nansum(jointDist, margWhich(i));
+                    margDist = sum(jointDist, margWhich(i), 'omitnan');
                 end
             end
             
