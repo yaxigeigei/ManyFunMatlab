@@ -92,7 +92,7 @@ classdef MKilosort2
             % Get default options
             ops.fbinary = binFile;
             ops.fproc   = fullfile(outDir, 'temp_wh.dat'); % proc file on a fast SSD
-            ops.chanMap = chanMapFile;
+            ops.chanMap = char(chanMapFile);
             ops.trange  = [0 Inf]; % time range to sort
             ops.NchanTOT = 385; % total number of channels in your recording
             ops = fConfig(ops);
