@@ -1017,7 +1017,7 @@ classdef MMath
                 end
             end
             
-            sd = nanstd(A, 0, dim);
+            sd = std(A, 0, dim, 'omitnan');
             se = sd ./ sqrt(size(A,dim));
         end
         
