@@ -220,6 +220,10 @@ classdef Event
             
             mask = false(size(t));
             for i = 1 : numel(obj)
+                if isnan(obj(i))
+                    continue
+                end
+                
                 t1 = obj(i).T.tOn - tPad(i,1);
                 t2 = obj(i).T.tOff + tPad(i,2);
                 
