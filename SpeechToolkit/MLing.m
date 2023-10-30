@@ -80,6 +80,7 @@ classdef MLing
             %                   aa, steps, tscore       Outputs from MLing.SeqAlign function. See 
             %                                           its documentation for details.
             % 
+            % See also MLing.SeqAlign
             
             % Global alignment
             s1 = string(s1);

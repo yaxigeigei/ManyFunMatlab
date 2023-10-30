@@ -7,8 +7,8 @@ classdef MNeuro
             %   ccg = MNeuro.CCG(tEdges, spkTrain1, spkTrain2, spkTrain3, ...)
             %
             % Inputs
-            %   tEdges          A vector of time bin, two-sided.
-            %   spkTrainN       A vector of spike time.
+            %   tEdges          A vector of bin edges, two-sided.
+            %   spkTrainN       A vector of spike times.
             % Output
             %   ccg             A [numTrain, numTrain, numBin] array of histograms. Each element 
             %                   stores the number of pairwise intervals between two spike trains 

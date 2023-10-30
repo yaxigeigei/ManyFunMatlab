@@ -92,6 +92,10 @@ classdef MPlotter < handle
         
         function RemovePlot(this, ind)
             % Remove one or more plots from the plotTable
+            % 
+            %   RemovePlot()
+            %   RemovePlot(ind)
+            % 
             if ~exist('ind', 'var')
                 ind = 1:height(this.plotTable);
             end
@@ -512,14 +516,14 @@ classdef MPlotter < handle
                         % always update
                     case {'epoch', 'trial'}
                         if strcmp(updateType, {'time'})
-                            continue;
+                            continue
                         end
                     case 'manual'
                         if any(strcmp(updateType, {'time', 'epoch'}))
-                            continue;
+                            continue
                         end
                     otherwise
-                        continue;
+                        continue
                 end
                 
                 % Run function
