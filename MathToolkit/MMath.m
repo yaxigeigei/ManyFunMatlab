@@ -133,6 +133,132 @@ classdef MMath
             end
         end
         
+        function [pval, sig] = EstimatePval(X, null, varargin)
+            % Compute p-values from null distribution and the observed value(s)
+            % 
+            %   [pval, sig] = MMath.EstimatePval(X, null)
+            %   [pval, sig] = MMath.EstimatePval(X, null, 'Tail', 'two')
+            %   [pval, sig] = MMath.EstimatePval(X, null, 'AlphaList', [0.05 0.01 0.001])
+            %   [pval, sig] = MMath.EstimatePval(X, null, 'Method', 'empirical')
+            % 
+            % Inputs
+            %   null            A vector or a matrix of column vectors. Each vector contains values sampled from 
+            %                   the null distribution for each value in X.
+            %   X               A scalar or vector of value(s) for test.
+            %   'Tail'          'left', 'right', or 'two' (default) tailed test.
+            %   'AlphaList'     A vector of significance levels. Default is [0.05 0.01 0.001].
+            %   'Method'        'empirical' (default): calculate p-values using empirical quantiles.
+            %                   'gumbel': calculate p-value for maximum value of N samples drawn from Gaussian.
+            % Output
+            %   pval            p-values in the same size as input x.
+            %   sig             Level of significance given alpha value.
+            % 
+            % Credits
+            %   Adapted from Montijn et al. eLife 2021, https://github.com/JorritMontijn/zetatest
+            %   
+            %   Version history:
+            %   1.0 - March 11 2020
+            %       Created by Jorrit Montijn
+            %   
+            %   Sources:
+            %   Baglivo (2005)
+            %   Elfving (1947), https://doi.org/10.1093/biomet/34.1-2.111
+            %   Royston (1982), DOI: 10.2307/2347982
+            %   https://stats.stackexchange.com/questions/394960/variance-of-normal-order-statistics
+            %   https://stats.stackexchange.com/questions/9001/approximate-order-statistics-for-normal-random-variables
+            %   https://en.wikipedia.org/wiki/Extreme_value_theory
+            %   https://en.wikipedia.org/wiki/Gumbel_distribution
+            %   
+            
+            p = inputParser;
+            p.addParameter('Method', 'empirical', @(x) any(strcmpi(x, {'empirical', 'gumbel'})));
+            p.addParameter('AlphaList', [0.05 0.01 0.001], @(x) isnumeric(x));
+            p.addParameter('Tail', 'two', @(x) any(strcmpi(x, {'left', 'right', 'two'})));
+            p.parse(varargin{:});
+            method = p.Results.Method;
+            alphaList = p.Results.AlphaList;
+            tailMode = p.Results.Tail;
+            
+            % Standardize inputs
+            if isvector(null)
+                null = null(:);
+            end
+            if size(null,2) < numel(X)
+                null = repmat(null, [1 numel(X)]);
+            end
+            
+            if strcmpi(method, 'empirical')
+                % Calculate statistical significance using empirical quantiles
+                pval = nan(size(X));
+                for i = 1 : numel(X)
+                    x = X(i);
+                    nullVec = unique(null(:,i));
+                    if numel(nullVec) == 1 && x == nullVec
+                        rk = NaN;
+                    elseif x < min(nullVec) || isnan(x)
+                        rk = 0;
+                    elseif x > max(nullVec) || isinf(x)
+                        rk = numel(nullVec);
+                    else
+                        rk = interp1(nullVec, 1:numel(nullVec), x);
+                    end
+                    pval(i) = rk / numel(nullVec);
+                end
+            else
+                % 
+                nullMu = mean(null, 1);
+                nullVar = var(null, 0, 1);
+                
+                % Define constants
+                % define Euler-Mascheroni constant
+                dblEulerMascheroni = 0.5772156649015328606065120900824; %vpa(eulergamma)
+                
+%                 % define apery's constant
+%                 dblApery = 1.202056903159594285399738161511449990764986292;
+                
+                % Define Gumbel parameters from mean and variance
+                % derive beta parameter from variance
+                dblBeta = (sqrt(6).*sqrt(nullVar))./(pi);
+                % dblSkewness = (12*sqrt(6)*dblApery)/(pi.^3);
+                
+                % Derive mode from mean, beta and E-M constant
+                dblMode = nullMu - dblBeta.*dblEulerMascheroni;
+                
+                % Define Gumbel cdf
+                fGumbelCDF = @(x) exp(-exp(-((x(:)-dblMode)./dblBeta)));
+                
+                % Calculate output variables
+                % calculate cum dens at X
+                dblGumbelCDF = fGumbelCDF(X);
+                
+                % define p-value
+                pval = (1-dblGumbelCDF);
+                % transform to output z-score
+                Z = -norminv(pval/2);
+                
+                % approximation for large X
+                pval(isinf(Z)) = exp( (dblMode-X(isinf(Z)))./dblBeta );
+            end
+            
+            % Get significance level
+            alphaList = alphaList(:)'; % make row vector
+            switch tailMode
+                case 'both'
+                    sig = pval(:) < alphaList/2 | pval(:) > (1-alphaList/2);
+                case 'left'
+                    sig = pval(:) < alphaList;
+                case 'right'
+                    pval = 1 - pval;
+                    sig = pval(:) < alphaList;
+                otherwise
+                    error("'Tail' must be 'two', 'left', or 'right', but was '%s'.", tailMode);
+            end
+            sig = sum(sig, 2);
+            if isrow(X)
+                sig = sig';
+            end
+        end
+        
         function [H, p] = BootTest2(s1, s2, varargin)
             % 
             
