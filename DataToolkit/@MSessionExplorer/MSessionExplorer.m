@@ -844,7 +844,7 @@ classdef MSessionExplorer < handle
             p.addRequired('tbIn', @(x) ischar(x) || istable(x));
             p.addRequired('tEdges', @(x) iscell(x) || isnumeric(x));
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
-            p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
+            p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || ischar(x) || iscellstr(x) || isstring(x));
             p.addParameter('Method', 'linear');
             p.addParameter('Extrapolation', 'none');
             p.addParameter('Antialiasing', false, @islogical);
@@ -937,7 +937,7 @@ classdef MSessionExplorer < handle
             p.addRequired('tbIn', @(x) ischar(x) || istable(x));
             p.addRequired('tEdges', @(x) iscell(x) || isnumeric(x));
             p.addOptional('rowInd', [], @(x) isnumeric(x) || islogical(x));
-            p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || iscellstr(x));
+            p.addOptional('colInd', [], @(x) isnumeric(x) || islogical(x) || ischar(x) || iscellstr(x) || isstring(x));
             p.addParameter('Normalization', 'count');
             p.parse(tbIn, tEdges, varargin{:});
             rowInd = p.Results.rowInd;
@@ -1052,8 +1052,9 @@ classdef MSessionExplorer < handle
             elseif islogical(colInd)
                 % convert to numerical indices
                 colInd = find(colInd);
-            elseif iscellstr(colInd) 
+            elseif ischar(colInd) || iscellstr(colInd) || isstring(colInd)
                 % find column ind based on variable names
+                colInd = cellstr(colInd);
                 varNames = tb.Properties.VariableNames;
                 colNames = colInd;
                 for i = 1 : numel(colInd)
