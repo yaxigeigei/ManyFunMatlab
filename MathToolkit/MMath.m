@@ -243,8 +243,9 @@ classdef MMath
             % Get significance level
             alphaList = alphaList(:)'; % make row vector
             switch tailMode
-                case 'both'
-                    sig = pval(:) < alphaList/2 | pval(:) > (1-alphaList/2);
+                case 'two'
+                    pval = pval * 2;
+                    sig = pval(:) < alphaList | pval(:) > (1-alphaList);
                 case 'left'
                     sig = pval(:) < alphaList;
                 case 'right'
@@ -1172,7 +1173,7 @@ classdef MMath
             isUni = p.Results.UniformOutput;
             
             if isempty(cats)
-                cats = unique(vect);
+                cats = unique(vect, 'stable');
             end
             ranges = cell(numel(cats),1);
             for k = 1 : numel(cats)

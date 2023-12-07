@@ -752,7 +752,7 @@ classdef MPlot
             if istable(spk)
                 spk = spk{:,:};
             end
-            if ~iscell(spk{1})
+            if ~iscell(spk{1}) && ~isempty(spk{1})
                 [n_trials, n_units] = size(spk);
                 spk = mat2cell(spk, n_trials, ones(1,n_units));
             end
