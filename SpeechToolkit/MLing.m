@@ -122,7 +122,7 @@ classdef MLing
             p = inputParser();
             p.addOptional('pattern', '*_*.wav', @(x) isstring(x) || ischar(x) || iscellstr(x));
             p.parse(varargin{:});
-            pattern = p.Results.id;
+            pattern = p.Results.pattern;
             
             % Search for all sentences based on wav file
             search = MBrowse.Dir2Table(fullfile(srcDir, pattern));
