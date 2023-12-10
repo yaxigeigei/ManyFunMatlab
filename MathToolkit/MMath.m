@@ -180,12 +180,14 @@ classdef MMath
             tailMode = p.Results.Tail;
             
             % Standardize inputs
+            X = X(:)';
             if isvector(null)
                 null = null(:);
+                if numel(X) > 1
+                    null = repmat(null, [1 numel(X)]);
+                end
             end
-            if size(null,2) < numel(X)
-                null = repmat(null, [1 numel(X)]);
-            end
+            assert(numel(X)==size(null,2), "The number of elements in 'X' does not match the number of columns in 'null'.");
             
             if strcmpi(method, 'empirical')
                 % Calculate statistical significance using empirical quantiles
@@ -225,19 +227,19 @@ classdef MMath
                 dblMode = nullMu - dblBeta.*dblEulerMascheroni;
                 
                 % Define Gumbel cdf
-                fGumbelCDF = @(x) exp(-exp(-((x(:)-dblMode)./dblBeta)));
+                fGumbelCDF = @(x) exp(-exp(-((x-dblMode)./dblBeta)));
                 
                 % Calculate output variables
                 % calculate cum dens at X
                 dblGumbelCDF = fGumbelCDF(X);
                 
                 % define p-value
-                pval = (1-dblGumbelCDF);
-                % transform to output z-score
-                Z = -norminv(pval/2);
-                
-                % approximation for large X
-                pval(isinf(Z)) = exp( (dblMode-X(isinf(Z)))./dblBeta );
+                pval = dblGumbelCDF; % originally pval = (1-dblGumbelCDF);
+%                 % transform to output z-score
+%                 Z = -norminv(pval/2);
+%                 
+%                 % approximation for large X
+%                 pval(isinf(Z)) = exp( (dblMode-X(isinf(Z)))./dblBeta );
             end
             
             % Get significance level
