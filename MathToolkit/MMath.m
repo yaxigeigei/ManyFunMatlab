@@ -139,7 +139,7 @@ classdef MMath
             %   [pval, sig] = MMath.EstimatePval(X, null)
             %   [pval, sig] = MMath.EstimatePval(X, null, 'Tail', 'two')
             %   [pval, sig] = MMath.EstimatePval(X, null, 'AlphaList', [0.05 0.01 0.001])
-            %   [pval, sig] = MMath.EstimatePval(X, null, 'Method', 'empirical')
+            %   [pval, sig] = MMath.EstimatePval(X, null, 'Method', 'gumbel')
             % 
             % Inputs
             %   null            A vector or a matrix of column vectors. Each vector contains values sampled from 
@@ -147,8 +147,8 @@ classdef MMath
             %   X               A scalar or vector of value(s) for test.
             %   'Tail'          'left', 'right', or 'two' (default) tailed test.
             %   'AlphaList'     A vector of significance levels. Default is [0.05 0.01 0.001].
-            %   'Method'        'empirical' (default): calculate p-values using empirical quantiles.
-            %                   'gumbel': calculate p-value for maximum value of N samples drawn from Gaussian.
+            %   'Method'        'gumbel' (default): calculate p-values for maximum value of N samples drawn from Gaussian.
+            %                   'empirical': calculate p-values using empirical quantiles.
             % Output
             %   pval            p-values in the same size as input x.
             %   sig             Level of significance given alpha value.
@@ -171,7 +171,7 @@ classdef MMath
             %   
             
             p = inputParser;
-            p.addParameter('Method', 'empirical', @(x) any(strcmpi(x, {'empirical', 'gumbel'})));
+            p.addParameter('Method', 'gumbel', @(x) any(strcmpi(x, {'empirical', 'gumbel'})));
             p.addParameter('AlphaList', [0.05 0.01 0.001], @(x) isnumeric(x));
             p.addParameter('Tail', 'two', @(x) any(strcmpi(x, {'left', 'right', 'two'})));
             p.parse(varargin{:});
@@ -246,8 +246,10 @@ classdef MMath
             alphaList = alphaList(:)'; % make row vector
             switch tailMode
                 case 'two'
-                    pval = pval * 2;
-                    sig = pval(:) < alphaList | pval(:) > (1-alphaList);
+                    m = pval > 0.5;
+                    pval(m) = 1 - pval(m);
+                    pval = pval(:) * 2;
+                    sig = pval < alphaList;
                 case 'left'
                     sig = pval(:) < alphaList;
                 case 'right'
