@@ -174,7 +174,7 @@ classdef MSessionExplorer < handle
             tbInd = cellfun(@(x) find(strcmp(x, this.tableNames)), tbNames);
             
             % Copying
-            se = MSessionExplorer();
+            se = eval(class(this));
             se.isVerbose = this.isVerbose;
             for i = tbInd(:)'
                 se.SetTable(this.tableNames{i}, this.tot.tableData{i}, this.tot.tableType{i}, this.tot.referenceTime{i});
@@ -203,7 +203,7 @@ classdef MSessionExplorer < handle
             this = seArray(1); % handle the case where the input "this" is a vector
             
             % Output SE
-            se = MSessionExplorer();
+            se = eval(class(this));
             se.isVerbose = this.isVerbose;
             
             % Concatenate and set each table
@@ -280,7 +280,7 @@ classdef MSessionExplorer < handle
             
             % Initialize se objects with userData
             for k = numel(epInd) : -1 : 1
-                seArray(k) = MSessionExplorer();
+                seArray(k) = eval(class(this)); % inheritance compatible construction
                 seArray(k).isVerbose = this.isVerbose;
                 if isSplitUserData && numel(this.userData) == numel(epInd)
                     seArray(k).userData = this.userData(k);
@@ -305,6 +305,49 @@ classdef MSessionExplorer < handle
             end
             
             seArray = reshape(seArray, size(epochArg));
+        end
+        
+        function seTb = SplitConditions(this, condVars, sourceTbName)
+            % Split an SE into a table of SEs by conditions in the behavValue table
+            % Trials with NaN condition will be excluded except for opto
+            % 
+            %   seTb = SplitConditions(condVars)
+            %   seTb = SplitConditions(condVars, sourceTbName)
+            % 
+            % Inputs
+            %   condVars        1) One or more table column names. Conditions are defined by every unique conbination across 
+            %                      the values of these variables.
+            %                   2) A table with condition variables as columns.
+            %                   3) An empty [] variable. A condition variable called dummyCond will be used to group all epochs 
+            %                      in one condition.
+            %   sourceTbName    The name of the table to find columns specified by condVars.
+            %   
+            
+            % Construct grouping table
+            if isempty(condVars)
+                % Initialize table with a dummy grouping variable that includes all epochs in one group
+                dummyCond = ones(se.numEpochs, 1);
+                T = table(dummyCond);
+            elseif istable(condVars)
+                % Condition variables are provided as a table
+                T = condVars;
+            else
+                % Get and modify variables from the specified table
+                tb = this.GetTable(sourceTbName);
+                T = tb(:, condVars);
+            end
+            assert(height(T)==this.numEpochs, "The number of rows of the condVars table must match the number of epochs.");
+            
+            % Find epoch indices for each group
+            [condId, seTb] = findgroups(T);
+            for i = 1 : max(condId)
+                m = condId==i;
+                seTb.epochInd{i} = find(m);
+                seTb.numEpochs(i) = sum(m);
+            end
+            
+            % Split se
+            seTb.se = this.Split(seTb.epochInd);
         end
         
         function s = ToStruct(this)
