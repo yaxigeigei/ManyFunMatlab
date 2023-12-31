@@ -124,7 +124,7 @@ classdef Event
         function this = SetVfield(this, fieldName, val)
             % Assign value to a field in each V property of an object array
             % 
-            %   objs = objs.SetTfield(fieldName, val)
+            %   objs = objs.SetVfield(fieldName, val)
             % 
             % Inputs
             %   fieldName       Name of the field to assign.
