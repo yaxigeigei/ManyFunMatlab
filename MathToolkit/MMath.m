@@ -1093,17 +1093,42 @@ classdef MMath
             end
         end
         
-        function [a, I] = SortLike(a, b)
+        function [aSorted, I] = SortLike(a, b, isVerbose)
             % Sort elements in 'a' like how they are ordered in 'b'
             %
-            %   [a, I] = MMath.SortLike(a, b)
+            %   [aSorted, I] = MMath.SortLike(a, b)
+            %   [aSorted, I] = MMath.SortLike(a, b, isVerbose)
             %
-            b = b(ismember(b, a));
-            I = zeros(size(a));
-            for i = 1 : numel(a)
-                I(i) = find(a==b(i), 1);
+            % Inputs
+            %   a           A vector to sort on.
+            %   b           A vector with elements in target order to sort to.
+            %   isVerbose   Whether or not to show warnings. Default is true.
+            % Outputs
+            %   aSorted     The sorted vector a.
+            %   I           A vector of indices where aSorted = a(I).
+            % 
+            
+            if nargin < 3
+                isVerbose = true;
             end
-            a = a(I);
+            
+            nNotUni = numel(a) - numel(unique(a));
+            if nNotUni && isVerbose
+                warning("%i elements in 'a' are not unique. Only the first element of each unique value will be used.", nNotUni);
+            end
+
+            I = cell(size(b));
+            for i = 1 : numel(b)
+                I{i} = find(a==b(i), 1);
+            end
+            
+            isAbsent = cellfun(@isempty, I);
+            if any(isAbsent) && isVerbose
+                warning("%i members in 'b' cannot be found in 'a', and will be ignored.", sum(isAbsent));
+            end
+            
+            I = cat(1, I{:});
+            aSorted = a(I);
         end
         
         function B = SqueezeDims(A, dims)
