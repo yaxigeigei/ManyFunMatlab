@@ -1127,7 +1127,7 @@ classdef MMath
                 warning("%i members in 'b' cannot be found in 'a', and will be ignored.", sum(isAbsent));
             end
             
-            I = cat(1, I{:});
+            I = cat(1, I{~isAbsent});
             aSorted = a(I);
         end
         
