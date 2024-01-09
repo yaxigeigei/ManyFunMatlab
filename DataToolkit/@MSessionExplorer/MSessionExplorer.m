@@ -391,11 +391,12 @@ classdef MSessionExplorer < handle
             
             % Handle user input
             p = inputParser();
-            p.addRequired('tbName', @ischar);
+            p.addRequired('tbName', @(x) ischar(x) || (isscalar(x) && isstring(x)));
             p.addRequired('tb', @istable);
             p.addOptional('tableType', [], @(x) any(strcmp(x, this.supportedTableTypes)));
             p.addOptional('referenceTime', [], @isnumeric);
             p.parse(tbName, tb, varargin{:});
+            tbName = char(tbName);
             tbType = p.Results.tableType;
             refTimes = p.Results.referenceTime;
             
@@ -1035,8 +1036,8 @@ classdef MSessionExplorer < handle
     methods(Hidden, Access = protected)
         function val = IValidateTableName(this, tbName, isAssert)
             % The table name must be a string
-            val = ischar(tbName);
-            assert(~isAssert || val, 'A table name must be a character array rather than %s.', class(tbName));
+            val = ischar(tbName) || (isstring(tbName) && isscalar(tbName));
+            assert(~isAssert || val, 'A table name must be char or a single string rather than %s.', class(tbName));
             if ~val
                 return;
             end
