@@ -142,9 +142,9 @@ classdef MMath
             %   [pval, sig] = MMath.EstimatePval(X, null, 'Method', 'gumbel')
             % 
             % Inputs
+            %   X               A scalar or vector of value(s) for test.
             %   null            A vector or a matrix of column vectors. Each vector contains values sampled from 
             %                   the null distribution for each value in X.
-            %   X               A scalar or vector of value(s) for test.
             %   'Tail'          'left', 'right', or 'two' (default) tailed test.
             %   'AlphaList'     A vector of significance levels. Default is [0.05 0.01 0.001].
             %   'Method'        'gumbel' (default): calculate p-values for maximum value of N samples drawn from Gaussian.
