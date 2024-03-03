@@ -38,7 +38,7 @@ classdef MKilosort2
             p.KeepUnmatched = true;
             p.addOptional('binFile', [], @(x) ischar(x) || isstring(x) || isempty(x));
             p.addOptional('outFolder', [], @(x) ischar(x) || isstring(x) || isempty(x));
-            p.addParameter('ChannelMapFile', [], @(x) ischar(x) || isstring(x));
+            p.addParameter('ChannelMapFile', [], @(x) ischar(x) || isstring(x) || isempty(x));
             p.addParameter('ConfigFunc', [], @(x) isa(x, 'function_handle'));
             p.addParameter('DriftMapOnly', false, @islogical);
             p.parse(varargin{:});
@@ -67,26 +67,21 @@ classdef MKilosort2
                 mkdir(outDir);
             end
             
-            % Choose a preset configuration and channel map functions
-            if isempty(chanMapFile) || isempty(fConfig)
-                chanMapNames = {'NP1010_HalfCol'};
-                selected = listdlg( ...
-                    'PromptString', 'Select a preset configuration', ...
-                    'SelectionMode', 'single', ...
-                    'ListString', chanMapNames);
-                if isempty(selected)
-                    return;
-                end
-                
-                switch selected
-                    case 1
-                        chanMapFile = 'NP1_NHP_HalfCol_kilosortChanMap.mat';
-                        fConfig = @MKilosort2.Config384;
-                end
+            if isempty(chanMapFile)
+                % Extract channel map from ap.meta file
+                metaFile = strrep(binFile, '.bin', '.meta');
+                assert(logical(exist(metaFile, 'file')), "Channel map is not provided and the .meta file is not present with .bin file for extracting channel map info.");
+                chanMapFile = fullfile(outDir, "chanMap.mat");
+                MSpikeGLX.MetaToChanMap(metaFile, chanMapFile);
+            else
+                % Make a copy of the channel map file in the output directory
+                copyfile(chanMapFile, fullfile(outDir, "chanMap.mat"));
             end
             
-            % Duplicate channel map file to the output directory
-            copyfile(chanMapFile, fullfile(outDir, "chanMap.mat"));
+            if isempty(fConfig)
+                % Use default sorting configuration
+                fConfig = @MKilosort2.Config384;
+            end
             
             
             % Get default options
