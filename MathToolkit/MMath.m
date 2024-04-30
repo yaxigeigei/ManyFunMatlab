@@ -207,7 +207,7 @@ classdef MMath
                     pval(i) = rk / numel(nullVec);
                 end
             else
-                % 
+                % Calculate statistical significance using Gumbel approximation
                 nullMu = mean(null, 1);
                 nullVar = var(null, 0, 1);
                 
@@ -1303,5 +1303,6 @@ classdef MMath
         end
         
     end
+    
 end
 

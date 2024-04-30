@@ -671,6 +671,7 @@ classdef MNeuro
             % Compute contamination rate
             c = (1 - sqrt(1 - x)) / 2;
         end
+        
     end
 end
 
