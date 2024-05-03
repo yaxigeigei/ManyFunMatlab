@@ -267,11 +267,15 @@ classdef MKilosort2
             
             % Make a table of channel info
             chanTb = table;
-            chanTb.chanId = s.chanMap0ind;
-            chanTb.shankInd = s.shankInd;
-            chanTb.xcoords = s.xcoords;
-            chanTb.ycoords = s.ycoords;
-            chanTb.isConnected = logical(s.connected);
+            chanTb.chanId = s.chanMap0ind(:);
+            if isfield(s, 'shankInd')
+                chanTb.shankInd = s.shankInd(:);
+            else
+                chanTb.shankInd = s.kcoords(:);
+            end
+            chanTb.xcoords = s.xcoords(:);
+            chanTb.ycoords = s.ycoords(:);
+            chanTb.isConnected = logical(s.connected(:));
             
             % Remove the unconnected channel(s)
             chanTbKS = chanTb;
@@ -280,6 +284,23 @@ classdef MKilosort2
             % Sort table
             [chanTbKS, I] = sortrows(chanTbKS, {'shankInd', 'ycoords', 'xcoords'}, {'ascend', 'descend', 'ascend'});
             chanTbKS.sortInd = I;
+        end
+        
+        function s = ReadParamsPy(filePath)
+            % Get parameters from params.py by running lines in MATLAB
+            %   these include dat_path, dtype, n_channels_dat, sample_rate ...
+            
+            fid = fopen(filePath);
+            s = struct;
+            while ~feof(fid)
+                try
+                    l = fgetl(fid);
+                    eval(['s.' l ';']);
+                catch
+                    %warning('''%s'' cannot be evaluated.', l);
+                end
+            end
+            fclose(fid);
         end
         
         function varargout = ReadTsvFiles(ksDir, varargin)
@@ -347,17 +368,10 @@ classdef MKilosort2
             % Make a memory map to temp_wh.dat
             
             % Get parameters from params.py by running lines in MATLAB
-            %   these include dat_path, dtype, n_channels_dat, sample_rate ...
-            fid = fopen(fullfile(ksDir, 'params.py'));
-            while ~feof(fid)
-                try
-                    l = fgetl(fid);
-                    eval([l ';']);
-                catch
-                    %warning('''%s'' cannot be evaluated.', l);
-                end
-            end
-            fclose(fid);
+            s = MKilosort2.ReadParamsPy(fullfile(ksDir, 'params.py'));
+            dat_path = s.dat_path;
+            n_channels_dat = s.n_channels_dat;
+            dtype = s.dtype;
             
             % Map binary data to memory
             if ~exist(dat_path, 'file')
@@ -494,4 +508,5 @@ classdef MKilosort2
         end
         
     end
+    
 end
