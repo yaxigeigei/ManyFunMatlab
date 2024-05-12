@@ -886,8 +886,8 @@ classdef MMath
                 A(isoutlier(A, isoutlierArgs{:}, dim)) = NaN;
             end
             
-            m = nanmean(A, dim);
-            sd = nanstd(A, 0, dim);
+            m = mean(A, dim, 'omitnan');
+            sd = std(A, 0, dim, 'omitnan');
             se = sd ./ sqrt(size(A,dim));
             varargout{1} = m;
             varargout{2} = sd;
@@ -900,7 +900,7 @@ classdef MMath
                     % bootci can only sample along the first dimension, thus permuting A
                     dimOrder = [dim setdiff(1:ndims(A), dim)];
                     A = permute(A, dimOrder);
-                    ci = bootci(nboot, {@nanmean, A}, 'alpha', alphaVal, 'Options', ops);
+                    ci = bootci(nboot, {@(x) mean(x, 'omitnan'), A}, 'alpha', alphaVal, 'Options', ops);
                     
                     % Restore original dimension order
                     ci = permute(ci, [1 3:ndims(ci) 2]); % squeeze out the second (mean value) dimension
