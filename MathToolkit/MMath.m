@@ -991,8 +991,8 @@ classdef MMath
             end
             normType = lower(char(normType));
             
-            k = 1;
-            c = 0;
+            k = ones(1, size(A,2));
+            c = zeros(1, size(A,2));
             switch normType
                 case 'max'
                     k = max(A, [], 1, 'omitnan');
