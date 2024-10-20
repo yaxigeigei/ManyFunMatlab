@@ -545,12 +545,12 @@ classdef MPlot
                 % Calculate width by fold of cols
                 figWidth = widthSet(1) * colsWide;
                 
-                % Overwrite if at specific #cols
-                colOpts = [1 1.5 2];
-                optIdx = colsWide == colOpts;
-                if any(optIdx)
-                    figWidth = widthSet(colsWide == colOpts);
-                end
+                % % Overwrite if at specific #cols
+                % colOpts = [1 1.5 2];
+                % optIdx = colsWide == colOpts;
+                % if any(optIdx)
+                %     figWidth = widthSet(colsWide == colOpts);
+                % end
             end
             
             % 
@@ -726,6 +726,7 @@ classdef MPlot
             % 
             %   MPlot.PlotRasterStack(spk)
             %   MPlot.PlotRasterStack(spk, Y)
+            %   MPlot.PlotRasterStack(..., 'HeightScale', 0.8)
             %   MPlot.PlotRasterStack(..., 'Color', [])
             %   MPlot.PlotRasterStack(..., 'LineWidth', .5)
             %   MPlot.PlotRasterStack(..., 'Parent', [])
@@ -738,6 +739,7 @@ classdef MPlot
             %                      cell array of spike time vectors. This allows different units to 
             %                      have different number of trials.
             %   Y               A numeric vector for each raster's middle Y position.
+            %   'HeightScale'   The height of each raster set.
             %   'Color'         A unit-by-3 RGB or unit-by-4 RGBA array. If empty [], units alternate 
             %                   colors between [0 0 0 .7] and [.3 .3 .3 .7].
             %   'Parent'        Axes object to plot in.
@@ -843,6 +845,7 @@ classdef MPlot
             p.addParameter('Parent', [], @(x) isa(x, 'matlab.graphics.axis.Axes'));
             p.parse(varargin{:});
             unit_c = p.Results.Color;
+            alpha = 1;
             frac = p.Results.Scaling;
             style = p.Results.Style;
             indMU = p.Results.MarkUnits;
@@ -892,7 +895,7 @@ classdef MPlot
                         patch(ax, px, -py+y+1, unit_c(m,:), 'FaceAlpha', .1, 'EdgeColor', 'none', p.Unmatched);
                     case 'trace'
                         MPlot.ErrorShade(t, -hh(:,i)+y+1, ee(:,i), 'Color', unit_c(m,:), 'Alpha', 0.1, 'Parent', ax);
-                        plot(ax, t, -hh(:,i)+y+1, 'Color', [unit_c(m,:) .5], p.Unmatched);
+                        plot(ax, t, -hh(:,i)+y+1, 'Color', [unit_c(m,:) alpha], p.Unmatched);
                     otherwise
                         error('%s is not a supported style', style);
                 end
@@ -903,7 +906,6 @@ classdef MPlot
             ax.YTick = 1 : n_units;
             ax.YDir = 'reverse';
             ax.XGrid = 'on';
-%             ax.XMinorGrid = 'on';
         end
         
         function PlotHeatmapStack(T, MM, varargin)
