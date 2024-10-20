@@ -1015,6 +1015,7 @@ classdef MMath
                 otherwise
                     error("'%s' is not a valid normalization option.", normType);
             end
+            k(k==0) = eps;
             N = (A-c)./k;
         end
         
