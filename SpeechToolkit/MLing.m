@@ -247,9 +247,8 @@ classdef MLing
             dtype = class(labels);
             
             labels = cellstr(labels);
-            labels = upper(labels);
             for k = 1 : numel(labels)
-                L = labels{k};
+                L = upper(labels{k});
                 L(L>='0' & L<='9') = []; % remove the trailing digit in phonemes
                 I = find(strcmp(L, dict(:,1)), 1);
                 if ~isempty(I)
