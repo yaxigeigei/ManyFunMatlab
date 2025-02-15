@@ -70,8 +70,12 @@ classdef MPlot
             
             % Handles user inputs
             if isempty(varargin) || ischar(varargin{1})
-                % Default color is gray
+                % Default face color is gray
                 varargin = [{[.9 .9 .9]}, varargin];
+            end
+            if ~any(cellfun(@(x) (ischar(x) || isstring(x)) && startsWith('EdgeColor', x), varargin))
+                % Default No edge
+                varargin = [varargin {'EdgeColor', 'none'}];
             end
             
             % Convert logical mask to boundaries
@@ -93,7 +97,7 @@ classdef MPlot
             % Plots blocks
             xx = xRange(:,[1 2 2 1])';
             yy = yRange(:,[1 1 2 2])';
-            p = patch(xx, yy, varargin{:}, 'EdgeColor', 'none');
+            p = patch(xx, yy, varargin{:});
             if nargout > 0
                 varargout{1} = p;
             end
@@ -699,7 +703,7 @@ classdef MPlot
                     hh(i) = plot(x, y, '.', varargin);
                 end
                 if i == numel(xx)
-                    hold on;
+                    hold(hh(i).Parent, 'on');
                 end
             end
             
@@ -1262,6 +1266,39 @@ classdef MPlot
             barLength = round(barLength, 1, 'significant');
         end
         
+        function lb = StaggerLabels(lb, offsets)
+            % Satgger labels with added spaces
+            %
+            %   lb = StaggerLabels(lb)
+            %   lb = StaggerLabels(lb, offsets)
+            % 
+            % Inputs
+            %   lb          Label strings.
+            %   offsets     A vector of character offsets.
+            % Output
+            %   lb          Staggered label strings.
+            % 
+            lb = cellstr(lb(:));
+            if nargin < 2
+                offsets = -[0 median(cellfun(@length, lb))];
+            end
+            if isscalar(offsets)
+                offsets = [0 offsets];
+            end
+            offsets = round(offsets);
+            offsets = repmat(offsets(:), ceil(numel(lb)/numel(offsets)), 1);
+            offsets = offsets(1:numel(lb));
+            sp = arrayfun(@(x) repelem(' ', x), abs(offsets), 'Uni', false);
+            for i = 1 : numel(lb)
+                if offsets(i) > 0
+                    lb{i} = [sp{i} lb{i}];
+                else
+                    lb{i} = [lb{i} sp{i}];
+                end
+            end
+            lb = string(lb);
+        end
+        
         function varargout = Violin(pos, bb, nn, varargin)
             % Plot histograms as violins
             % 
@@ -1447,4 +1484,3 @@ classdef MPlot
     end
     
 end
-
