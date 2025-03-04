@@ -244,6 +244,7 @@ classdef MKilosort2
             % Load channel info from a channel map .mat file to a table
             % 
             %   [chanTb, chanTbKS] = MKilosort2.LoadChanMap2Table(chanMapFile)
+            %   [chanTb, chanTbKS] = MKilosort2.LoadChanMap2Table(SpikeGLXMetaFile)
             % 
             % Input:
             %   chanMapFile         Path of a channel map MAT file, e.g. NP1_NHP_HalfCol_kilosortChanMap.mat.
@@ -254,6 +255,7 @@ classdef MKilosort2
             %                       ycoords         Y coordinates of channels in microns.
             %                       connected       Binary vector indicating what channels are valid.
             %                                       Reference and bad channels are usually set to 0.
+            %   SpikeGLXMetaFile    Path of a SpikeGLX meta file, e.g. ap.meta or lf.meta.
             % Outputs:
             %   chanTb              A table that organizes varibales from chanMapFile in columns.
             %   chanTbKS            Similar to chanTb but only with connected channels. This table is consistent
@@ -261,9 +263,16 @@ classdef MKilosort2
             %                       the rows are sorted spatially in the order of increasing shank ID, decreasing 
             %                       y coordinate (distance to tip), and increasing x coordinate.
             % 
+            % See also: MSpikeGLX.MetaToChanMap
             
             % Load mat file
-            s = load(chanMapFile);
+            if endsWith(chanMapFile, '.mat')
+                s = load(chanMapFile);
+            elseif endsWith(chanMapFile, '.meta')
+                s = MSpikeGLX.MetaToChanMap(chanMapFile);
+            else
+                error('Incorrect file type: %s', chanMapFile);
+            end
             
             % Make a table of channel info
             chanTb = table;
@@ -412,10 +421,6 @@ classdef MKilosort2
             %   sn                  A channel-by-time-by-#snippets array of signal values.
             % 
             
-            tmInd = double(tmInd(:));
-            nSn = numel(tmInd);
-            [nCh, nTm] = size(mmap.Data.V);
-            
             p = inputParser();
             p.addOptional('chInd', [], @(x) isnumeric(x) && isvector(x));
             p.addOptional('chWin', [0 0], @(x) isnumeric(x) && numel(x)==2);
@@ -429,16 +434,23 @@ classdef MKilosort2
             vScale = p.Results.VoltScale;
             filtObj = p.Results.Filter;
             
+            tmInd = double(tmInd(:));
+            nSn = numel(tmInd);
+            nCh = mmap.Format{2}(1);
+            nTm = mmap.Format{2}(2);
+            
+            if isempty(cOrder)
+                cOrder = 1 : nCh;
+            else
+                nCh = numel(cOrder);
+            end
+            
             if isempty(chInd)
                 chInd = 1;
                 chWin = [0 nCh-1];
             end
             if isscalar(chInd)
                 chInd = ones(size(tmInd))*chInd;
-            end
-            
-            if isempty(cOrder)
-                cOrder = 1 : nCh;
             end
             
             % Read data
