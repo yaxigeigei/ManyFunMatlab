@@ -539,7 +539,7 @@ classdef MPlot
             
             switch journalStyle
                 case 'nature'
-                    widthSet = [8.9 12 18.3];
+                    widthSet = [9.0 12 18.0];
                 case 'cell'
                     widthSet = [8.5 11.4 17.4];
             end
