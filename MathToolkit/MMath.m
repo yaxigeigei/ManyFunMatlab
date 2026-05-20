@@ -147,8 +147,8 @@ classdef MMath
             %                   the null distribution for each value in X.
             %   'Tail'          'left', 'right', or 'two' (default) tailed test.
             %   'AlphaList'     A vector of significance levels. Default is [0.05 0.01 0.001].
-            %   'Method'        'gumbel' (default): calculate p-values for maximum value of N samples drawn from Gaussian.
-            %                   'empirical': calculate p-values using empirical quantiles.
+            %   'Method'        'empirical' (default): calculate finite-null p-values using counts and +1 correction.
+            %                   'gumbel': calculate p-values for maximum value of N samples drawn from Gaussian.
             % Output
             %   pval            p-values in the same size as input x.
             %   sig             Level of significance given alpha value.
@@ -171,7 +171,7 @@ classdef MMath
             %   
             
             p = inputParser;
-            p.addParameter('Method', 'gumbel', @(x) any(strcmpi(x, {'empirical', 'gumbel'})));
+            p.addParameter('Method', 'empirical', @(x) any(strcmpi(x, {'empirical', 'gumbel'})));
             p.addParameter('AlphaList', [0.05 0.01 0.001], @(x) isnumeric(x));
             p.addParameter('Tail', 'two', @(x) any(strcmpi(x, {'left', 'right', 'two'})));
             p.parse(varargin{:});
@@ -190,22 +190,33 @@ classdef MMath
             assert(numel(X)==size(null,2), "The number of elements in 'X' does not match the number of columns in 'null'.");
             
             if strcmpi(method, 'empirical')
-                % Calculate statistical significance using empirical quantiles
+                % Calculate statistical significance using finite-null counts
                 pval = nan(size(X));
                 for i = 1 : numel(X)
                     x = X(i);
-                    nullVec = unique(null(:,i));
-                    if numel(nullVec) == 1 && x == nullVec
-                        rk = NaN;
-                    elseif x < min(nullVec) || isnan(x)
-                        rk = 0;
-                    elseif x > max(nullVec) || isinf(x)
-                        rk = numel(nullVec);
-                    else
-                        rk = interp1(nullVec, 1:numel(nullVec), x);
+                    nullVec = null(:,i);
+                    nullVec = nullVec(~isnan(nullVec));
+                    n = numel(nullVec);
+                    if n == 0 || isnan(x)
+                        continue
                     end
-                    pval(i) = rk / numel(nullVec);
+                    pLeft = (1 + sum(nullVec <= x)) / (n + 1);
+                    pRight = (1 + sum(nullVec >= x)) / (n + 1);
+                    switch tailMode
+                        case 'left'
+                            pval(i) = pLeft;
+                        case 'right'
+                            pval(i) = pRight;
+                        case 'two'
+                            pval(i) = min(1, 2 * min(pLeft, pRight));
+                    end
                 end
+                sig = pval(:) < alphaList;
+                sig = sum(sig, 2);
+                if isrow(X)
+                    sig = sig';
+                end
+                return
             else
                 % Calculate statistical significance using Gumbel approximation
                 nullMu = mean(null, 1);
