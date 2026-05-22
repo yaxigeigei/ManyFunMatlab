@@ -211,7 +211,8 @@ classdef MMath
                             pval(i) = min(1, 2 * min(pLeft, pRight));
                     end
                 end
-                sig = pval(:) < alphaList;
+                pval = pval(:);
+                sig = pval < alphaList;
                 sig = sum(sig, 2);
                 if isrow(X)
                     sig = sig';
